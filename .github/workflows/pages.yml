@@ -1,0 +1,55 @@
+name: Publish travel map to GitHub Pages
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'travel-data/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  detect-source:
+    runs-on: ubuntu-latest
+    outputs:
+      actions: ${{ steps.source.outputs.actions }}
+    steps:
+      - name: Preserve the existing Pages source
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          build_type="$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .build_type)"
+          if [ "$build_type" = "workflow" ]; then
+            echo "actions=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "actions=false" >> "$GITHUB_OUTPUT"
+            echo "Branch-based Pages publishes the committed standalone files."
+          fi
+  deploy:
+    needs: detect-source
+    if: needs.detect-source.outputs.actions == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build:standalone
+      - run: mkdir -p pages-site && cp dist/our-korea.html pages-site/index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-site
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

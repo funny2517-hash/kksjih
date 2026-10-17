@@ -4,7 +4,13 @@ import {
   saveRecord,
   deleteRecord,
   importRecords,
-} from "./storage.js";
+  githubSettings,
+  githubMode,
+  githubConnected,
+  connectGitHub,
+  disconnectGitHub,
+  uploadLocalRecords,
+} from "./github-session.js";
 import {
   validateRecord,
   parseBackup,
@@ -99,7 +105,7 @@ async function start() {
   );
   landmarks = islandLandmarks(geo, dokdo);
   rests = mergeRestAreas(rests);
-  records = await loadRecords();
+  records = githubMode() ? [] : await loadRecords();
   geo.features.forEach((f) => {
     const target = targetForFeature(f);
     targets.set(target.id, target);
@@ -112,14 +118,17 @@ async function start() {
     }),
   );
   $("#app").innerHTML = `
-  <header><a class="brand" href="" aria-label="둘의 지도 홈"><span class="brand-mark">◒</span><div>둘의 지도<small>OUR LITTLE KOREA</small></div></a><div class="header-copy">함께 다녀온 곳이, 우리의 지도가 돼요.</div><div class="backup-actions"><span class="local-badge">● 이 브라우저에 저장</span><button id="backup">↓ 백업</button><button id="restore">↑ 복원</button><input id="restore-file" type="file" accept="application/json,.json" hidden></div></header>
+  <header><a class="brand" href="" aria-label="둘의 지도 홈"><span class="brand-mark">◒</span><div>둘의 지도<small>OUR LITTLE KOREA</small></div></a><div class="header-copy">함께 다녀온 곳이, 우리의 지도가 돼요.</div><div class="backup-actions"><span class="local-badge">● 이 브라우저에 저장</span><button id="github-settings">☁ GitHub 연결</button><button id="backup">↓ 백업</button><button id="restore">↑ 복원</button><input id="restore-file" type="file" accept="application/json,.json" hidden></div></header>
+  <section id="github-banner" class="github-banner" hidden><span id="github-summary"></span><button id="github-refresh">↻ 새로고침</button><button id="github-open">연결 설정</button></section>
   <section class="topline"><div><span class="eyebrow">ONE TRIP, ONE PIECE</span><h1>차곡차곡, 우리 여행 조각</h1><p>낯선 도시의 설렘부터 휴게소의 작은 추억까지.</p></div><div class="stats"><div><strong id="region-count">0</strong><span>방문한 지역</span></div><div><strong id="rest-count">0</strong><span>들른 휴게소</span></div><div><strong id="memory-count">0</strong><span>함께 쓴 기록</span></div></div></section>
   <main><aside class="explore"><div class="tabs" role="tablist" aria-label="지도 종류"><button role="tab" id="region-tab" aria-selected="true">전국 여행</button><button role="tab" id="rest-tab" aria-selected="false">휴게소</button></div><div class="explore-intro"><h2 id="explore-title">우리의 다음 여행지는?</h2><p id="explore-copy">지도에서 지역을 선택해 추억을 남겨요.</p></div><label class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="시·도 검색" aria-label="지역 또는 휴게소 검색"></label><label class="route-filter" hidden>고속도로 노선<select id="route"><option value="">모든 노선</option></select></label><label class="visited-filter"><input id="visited-only" type="checkbox"> 방문한 곳만 보기</label><div class="list-heading"><span id="list-caption">전국 시·도</span><span id="list-count"></span></div><div id="place-list" class="place-list"></div><div class="sidebar-note">사진 한 장이 여행의 한 조각.<br>우리만의 대한민국을 완성해 보세요.</div></aside>
   <section class="map-panel" aria-label="대한민국 여행 지도"><div class="map-top"><div><span class="live-dot"></span><b id="map-title">대한민국 여행 퍼즐</b><span id="map-subtitle">시·도 → 시·군·구</span></div><label id="highway-control" hidden><input type="checkbox" id="highways" checked> 고속도로</label><label><input type="checkbox" id="labels" checked> 지역명</label></div><nav id="map-breadcrumb" aria-label="행정구역 탐색 경로"></nav><nav class="island-shortcuts" aria-label="섬 바로가기"><button type="button" data-island-open="ulleung">울릉도</button><button type="button" data-island-open="dokdo">독도</button></nav><svg id="map" viewBox="0 0 900 820" role="img" aria-label="실제 대한민국 행정구역 지도. 마우스 휠로 확대하고 드래그로 이동할 수 있습니다."></svg><div class="map-watermark">OUR<br>LITTLE<br>KOREA<span>함께 채우는 여행 지도</span></div><div class="map-controls"><button id="zoom-in" aria-label="지도 확대">＋</button><button id="zoom-out" aria-label="지도 축소">−</button><button id="reset-map" aria-label="전국 지도 보기">⌂</button></div><div class="map-legend"><span><i class="unvisited"></i>기다리는 여행</span><span><i class="visited"></i>우리의 발자국</span><span id="rest-shape-legend" hidden>□ 방향별 시설 · ○ 단일 시설</span><b id="zoom-level">100%</b></div><div id="map-tooltip" hidden></div></section>
   <aside id="details" class="details" aria-label="여행 기록"></aside></main>
   <footer><span>둘만의 순간을, 지도 위에 오래도록.</span><button id="data-info">지도 데이터·저장 안내 ↗</button></footer>
+
+  <dialog id="github-dialog" aria-labelledby="github-heading"><h2 id="github-heading">GitHub에 사진과 기록 저장</h2><p>사진을 선택하고 저장하면 GitHub 저장소의 <b>travel-data</b> 폴더에 직접 업로드합니다. 두 사람은 같은 저장소를 연결해 사용하세요.</p><p class="github-permission">공개 저장소에 올린 사진과 메모는 누구나 볼 수 있습니다. 비공개 사진에는 Pages를 켜지 않은 별도 비공개 저장소를 권장합니다. 토큰은 현재 사이트 탭의 메모리에만 보관하며 사이트 코드나 백업에 넣지 않습니다.</p><label>저장소<input id="github-repository" type="text" autocomplete="off" placeholder="소유자/저장소"></label><label>브랜치<input id="github-branch" type="text" autocomplete="off" placeholder="main"></label><label>저장소 전용 토큰<input id="github-token" type="password" autocomplete="off" spellcheck="false" placeholder="GitHub personal access token"></label><label class="github-public"><input id="github-public" type="checkbox"> 공개 저장소라면 사진과 메모도 공개됨을 이해했습니다.</label><p id="github-status" role="status" aria-live="polite"></p><div class="github-buttons"><button id="github-connect" class="primary">저장소 연결</button><a id="github-folder-link" target="_blank" rel="noreferrer" hidden>GitHub 저장소 열기 ↗</a><button id="github-migrate" hidden>이 브라우저 기록을 GitHub로 복사</button><button id="github-disconnect" hidden>연결 해제 · 브라우저 저장으로 전환</button></div><details><summary>토큰 만드는 방법</summary><p>GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens에서 새 토큰을 만드세요. 사진을 저장할 저장소 하나만 선택하고 Repository permissions의 <b>Contents: Read and write</b>를 허용합니다. 만료일을 설정하고 위에 입력하세요. 두 사람은 각자 계정의 토큰을 사용합니다. 개인 저장소의 외부 협업자는 fine-grained 토큰으로 연결이 제한될 수 있습니다. 이 경우 두 사람이 멤버인 조직의 저장소를 사용하거나 README의 classic 토큰 안내를 확인하세요.</p><p>GitHub Pages는 화면을 제공하고, GitHub API가 파일을 저장합니다. 사이트용 저장소와 사진용 비공개 저장소를 다르게 지정해도 됩니다. 사진은 Git 이력에 누적됩니다. 지도에서 삭제해도 이전 사진과 수정본은 저장소 이력에 남습니다. 사진을 아주 많이 보관하는 용도에는 적합하지 않습니다.</p></details><button data-close>닫기</button></dialog>
   <div id="notice" role="status" hidden></div>
-  <dialog id="info-dialog"><h2>실제 지도로 만나는 대한민국</h2><p>행정경계: 통계청(KOSTAT) 기반 South Korea Maps의 <b>2018년 경계 기반 시·도 17개 → 최종 시·군·구 229개</b>를 표시합니다. 도의 일반시 안에 나뉜 구는 실제 경계를 합쳐 시로 표시합니다. 사진은 최종 지역에만 등록합니다. 원본을 형태 보존 방식으로 단순화했습니다. 누락된 독도 동·서도는 별도의 실제 2018년 SGIS 경계로 보완했으며, 울릉도·독도를 이동시킨 삽입지도는 사용하지 않습니다. 작은 점과 연결선은 위치 식별용 표식입니다. 최신 행정구역과 차이가 있을 수 있습니다.</p><p>휴게소: 공개 저장소 rest_area_main의 위치 데이터 <b>210개 원본을 ${rests.length}곳으로 통합</b>해 표시합니다. 같은 노선·이름의 상·하행은 네모 지점 하나로 표시하며, 선택하면 방향 탭별로 사진과 기록을 따로 저장합니다. 단일 시설은 동그라미입니다. 대표 위치는 원본 좌표 중 하나를 사용하며, 전국 모든 휴게소 및 최신 개통·폐쇄를 보장하지 않습니다. 임의 생성한 좌표는 없습니다.</p><p>고속도로 선: Natural Earth의 실제 도로 형상 중 expressway 분류를 사용합니다(퍼블릭 도메인). 전국 흐름을 보여주는 축척 1:1천만의 과거 개략 데이터이며 최신 개통 구간·램프·상세 선형은 누락될 수 있습니다. 휴게소 좌표를 이어 만든 선이 아닙니다. 노선 번호 정보가 없어 노선 필터는 휴게소에만 적용됩니다. <a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noreferrer">출처·이용 조건</a></p><p>사진과 기록은 이 기기·브라우저의 IndexedDB에 저장됩니다. 서버 업로드나 기기 간 자동 동기화는 없습니다. 브라우저 데이터 삭제·시크릿 모드에서는 소실될 수 있으므로 정기적으로 백업하세요. 사진은 긴 변 1600px JPEG로 저장됩니다.</p><p><a href="https://github.com/southkorea/southkorea-maps" target="_blank" rel="noreferrer">경계 데이터 출처</a> · <a href="https://github.com/kmj381900-debug/rest_area_main" target="_blank" rel="noreferrer">휴게소 데이터 출처</a></p><p class="data-attribution">독도 경계: 통계청 SGIS 공공누리 제1유형 자료를 가공한 vuski/admdongkor, CC BY 4.0. <a href="https://github.com/vuski/admdongkor" target="_blank" rel="noreferrer">출처</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">라이선스</a></p><button class="primary" data-close>확인</button></dialog>
+  <dialog id="info-dialog"><h2>실제 지도로 만나는 대한민국</h2><p>행정경계: 통계청(KOSTAT) 기반 South Korea Maps의 <b>2018년 경계 기반 시·도 17개 → 최종 시·군·구 229개</b>를 표시합니다. 도의 일반시 안에 나뉜 구는 실제 경계를 합쳐 시로 표시합니다. 사진은 최종 지역에만 등록합니다. 원본을 형태 보존 방식으로 단순화했습니다. 누락된 독도 동·서도는 별도의 실제 2018년 SGIS 경계로 보완했으며, 울릉도·독도를 이동시킨 삽입지도는 사용하지 않습니다. 작은 점과 연결선은 위치 식별용 표식입니다. 최신 행정구역과 차이가 있을 수 있습니다.</p><p>휴게소: 공개 저장소 rest_area_main의 위치 데이터 <b>210개 원본을 ${rests.length}곳으로 통합</b>해 표시합니다. 같은 노선·이름의 상·하행은 네모 지점 하나로 표시하며, 선택하면 방향 탭별로 사진과 기록을 따로 저장합니다. 단일 시설은 동그라미입니다. 대표 위치는 원본 좌표 중 하나를 사용하며, 전국 모든 휴게소 및 최신 개통·폐쇄를 보장하지 않습니다. 임의 생성한 좌표는 없습니다.</p><p>고속도로 선: Natural Earth의 실제 도로 형상 중 expressway 분류를 사용합니다(퍼블릭 도메인). 전국 흐름을 보여주는 축척 1:1천만의 과거 개략 데이터이며 최신 개통 구간·램프·상세 선형은 누락될 수 있습니다. 휴게소 좌표를 이어 만든 선이 아닙니다. 노선 번호 정보가 없어 노선 필터는 휴게소에만 적용됩니다. <a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noreferrer">출처·이용 조건</a></p><p>기본 모드에서는 사진과 기록을 이 기기·브라우저의 IndexedDB에 저장합니다. GitHub를 연결하면 선택한 저장소에 사진과 기록을 업로드합니다. 상대방의 변경은 새로고침으로 가져옵니다. GitHub 토큰은 메모리에만 보관하며 재접속 시 다시 입력해야 합니다. 공개 저장소에 업로드한 사진과 메모는 공개됩니다. 브라우저 데이터 삭제·시크릿 모드에서는 소실될 수 있으므로 정기적으로 백업하세요. 사진은 긴 변 1600px JPEG로 저장됩니다.</p><p><a href="https://github.com/southkorea/southkorea-maps" target="_blank" rel="noreferrer">경계 데이터 출처</a> · <a href="https://github.com/kmj381900-debug/rest_area_main" target="_blank" rel="noreferrer">휴게소 데이터 출처</a></p><p class="data-attribution">독도 경계: 통계청 SGIS 공공누리 제1유형 자료를 가공한 vuski/admdongkor, CC BY 4.0. <a href="https://github.com/vuski/admdongkor" target="_blank" rel="noreferrer">출처</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">라이선스</a></p><button class="primary" data-close>확인</button></dialog>
   <dialog id="restore-dialog"><h2>여행 기록을 복원할까요?</h2><p id="restore-summary"></p><p>기존 기록을 유지하며 추가합니다. 같은 ID의 기록은 백업 내용으로 덮어씁니다. 복원 전 현재 기록을 백업해 두세요.</p><div class="dialog-actions"><button data-close>취소</button><button id="confirm-restore" class="primary">복원하기</button></div></dialog>
   <dialog id="photo-dialog"><button data-close aria-label="사진 닫기">✕ 닫기</button><img id="large-photo" alt="여행 사진 크게 보기"></dialog>`;
   bind();
@@ -129,6 +138,7 @@ async function start() {
   renderDetails();
 }
 function bind() {
+  bindGitHub();
   document
     .querySelectorAll("[data-island-open]")
     .forEach(
@@ -353,6 +363,7 @@ function matches(t) {
   );
 }
 function update() {
+  renderGitHubStatus();
   $("#region-count").textContent = [...targets.values()].filter(
     (t) => t.level === "municipality" && listRecords(t.id).length,
   ).length;
@@ -810,7 +821,11 @@ function renderDetails() {
       (b.onclick = async () => {
         if (
           !canLeave() ||
-          !confirm("이 기록과 사진을 삭제할까요? 삭제 전 백업을 권장합니다.")
+          !confirm(
+            githubMode()
+              ? "지도에서 이 기록을 삭제할까요? 이전 수정본과 사진은 GitHub에 보존됩니다."
+              : "이 기록과 사진을 삭제할까요? 삭제 전 백업을 권장합니다.",
+          )
         )
           return;
         try {
@@ -860,7 +875,7 @@ function openEditor(r) {
   photos = [...(r?.photos || [])];
   dirty = false;
   $("#editor").innerHTML =
-    `<form id="record-form" novalidate><div class="form-top"><b>${r ? "추억 수정하기" : "새로운 여행 기록"}</b><button type="button" id="cancel-editor" aria-label="기록 작성 취소">✕</button></div><label>방문 날짜<input name="date" type="date" required value="${escape(r?.date || today())}"></label><label>한 줄 제목<input name="title" maxlength="100" placeholder="우리의 어떤 하루였나요?" value="${escape(r?.title ?? (selectedIsland ? landmarks.find((point) => point.id === selectedIsland).name + " 여행" : ""))}"></label><label>여행 메모<textarea name="memo" rows="4" maxlength="5000" placeholder="함께 본 풍경, 맛있었던 음식, 기억하고 싶은 마음…">${escape(r?.memo || "")}</textarea></label><label class="photo-upload">＋ 사진 추가 <span>최대 6장 · 장당 12MB</span><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="photo-previews"></div><p class="form-hint">사진은 긴 변 1600px로 줄여 이 브라우저에만 저장해요.</p><p id="form-status" class="form-status" role="status" aria-live="polite" hidden></p><button class="primary" id="save-record" type="submit">추억 저장하기</button></form>`;
+    `<form id="record-form" novalidate><div class="form-top"><b>${r ? "추억 수정하기" : "새로운 여행 기록"}</b><button type="button" id="cancel-editor" aria-label="기록 작성 취소">✕</button></div><label>방문 날짜<input name="date" type="date" required value="${escape(r?.date || today())}"></label><label>한 줄 제목<input name="title" maxlength="100" placeholder="우리의 어떤 하루였나요?" value="${escape(r?.title ?? (selectedIsland ? landmarks.find((point) => point.id === selectedIsland).name + " 여행" : ""))}"></label><label>여행 메모<textarea name="memo" rows="4" maxlength="5000" placeholder="함께 본 풍경, 맛있었던 음식, 기억하고 싶은 마음…">${escape(r?.memo || "")}</textarea></label><label class="photo-upload">＋ 사진 추가 <span>최대 6장 · 장당 12MB</span><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="photo-previews"></div><p class="form-hint">${githubMode() ? "사진은 긴 변 1600px로 줄여 연결한 GitHub에 업로드해요." : "사진은 긴 변 1600px로 줄여 이 브라우저에만 저장해요."}</p><p id="form-status" class="form-status" role="status" aria-live="polite" hidden></p><button class="primary" id="save-record" type="submit">추억 저장하기</button></form>`;
   if (t.type === "rest") {
     const options = restDirections(t);
     const pointId = r?.target || activeRestPoint;
@@ -981,3 +996,117 @@ start().catch((e) => {
   $("#app").innerHTML =
     `<div class="boot"><h1>지도를 열지 못했어요</h1><p>${escape(errorMessage(e))}</p><p>브라우저의 사이트 저장소 사용을 허용하고 다시 시도해 주세요.</p><button onclick="location.reload()">다시 시도</button></div>`;
 });
+
+function renderGitHubStatus() {
+  const config = githubSettings();
+  const cloud = githubMode();
+  const connected = githubConnected();
+  $(".local-badge").textContent = cloud
+    ? connected
+      ? "● GitHub에 저장"
+      : "○ GitHub 재연결 필요"
+    : "● 이 브라우저에 저장";
+  $("#github-settings").textContent = cloud
+    ? "☁ GitHub 설정"
+    : "☁ GitHub 연결";
+  $("#github-banner").hidden = !cloud;
+  $("#github-summary").textContent = connected
+    ? `${config.repository} · ${config.private ? "비공개" : "공개 저장소 · 사진과 메모 공개"} · 상대방 기록은 새로고침으로 가져와요.`
+    : "GitHub 연결 대기 · 토큰을 다시 입력하면 저장된 사진과 기록을 불러옵니다.";
+  $("#github-refresh").disabled = !connected;
+  $("#github-migrate").hidden = !connected;
+  $("#github-disconnect").hidden = !cloud;
+  const link = $("#github-folder-link");
+  link.hidden = !config.repository;
+  if (config.repository) link.href = `https://github.com/${config.repository}`;
+}
+function bindGitHub() {
+  const status = $("#github-status");
+  const statusText = (text, error = false) => {
+    status.textContent = text;
+    status.classList.toggle("error", error);
+  };
+  const dialog = $("#github-dialog");
+  dialog.addEventListener("close", () => {
+    $("#github-token").value = "";
+  });
+  const open = () => {
+    if (busy) return;
+    const config = githubSettings();
+    $("#github-repository").value =
+      config.repository || "funny2517-hash/kksjih";
+    $("#github-branch").value = config.branch || "main";
+    $("#github-token").value = "";
+    $("#github-public").checked = false;
+    renderGitHubStatus();
+    statusText(
+      "저장소와 전용 토큰을 입력하고 연결하세요. 토큰은 영구 저장하지 않습니다.",
+    );
+    dialog.showModal();
+  };
+  $("#github-settings").onclick = open;
+  $("#github-open").onclick = open;
+  async function task(action, message, close = false) {
+    if (busy || !canLeave()) return;
+    busy = true;
+    dialog.querySelectorAll("button,input").forEach((b) => (b.disabled = true));
+    statusText(message);
+    try {
+      await action();
+      editing = null;
+      dirty = false;
+      update();
+      renderDetails();
+      statusText("완료했어요. 두 사람은 같은 저장소를 연결해 사용하세요.");
+      if (close) dialog.close();
+    } catch (e) {
+      statusText(errorMessage(e), true);
+      notify(errorMessage(e), true);
+    } finally {
+      busy = false;
+      dialog
+        .querySelectorAll("button,input")
+        .forEach((b) => (b.disabled = false));
+      renderGitHubStatus();
+    }
+  }
+  $("#github-connect").onclick = () =>
+    task(async () => {
+      records = await connectGitHub(
+        {
+          token: $("#github-token").value,
+          repository: $("#github-repository").value,
+          branch: $("#github-branch").value,
+          allowPublic: $("#github-public").checked,
+        },
+        recordTargets(targets),
+      );
+      $("#github-token").value = "";
+      notify(
+        "GitHub를 연결했어요. 이제 사진과 기록은 저장소에 직접 업로드됩니다.",
+      );
+    }, "GitHub 권한을 확인하고 기록을 불러오고 있어요…");
+  $("#github-refresh").onclick = () =>
+    task(async () => {
+      records = await loadRecords();
+      notify("GitHub에서 최신 기록을 불러왔어요.");
+    }, "최신 기록을 불러오고 있어요…");
+  $("#github-migrate").onclick = () =>
+    task(async () => {
+      const result = await uploadLocalRecords();
+      records = await loadRecords();
+      notify(
+        `${result.added}개 기록을 복사했어요. 같은 ID ${result.skipped}개는 건너뛰었고, 브라우저 원본은 유지됩니다.`,
+      );
+    }, "이 브라우저의 사진과 기록을 업로드하고 있어요. 창을 닫지 마세요…");
+  $("#github-disconnect").onclick = () =>
+    task(
+      async () => {
+        disconnectGitHub();
+        records = await loadRecords();
+        notify("브라우저 저장으로 전환했어요. GitHub 원본은 그대로 있습니다.");
+      },
+      "브라우저 저장으로 전환하고 있어요…",
+      true,
+    );
+}

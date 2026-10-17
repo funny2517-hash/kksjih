@@ -8,6 +8,10 @@
   </head>
   <body>
     <div id="app"><p class="boot">우리의 여행 지도를 펼치는 중…</p></div>
+    <!-- A branch-based GitHub Pages deployment serves the generated standalone app. -->
+    <script type="module">
+      if (!import.meta.env) window.location.replace(new URL("./downloads/", window.location.href));
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

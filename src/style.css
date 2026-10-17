@@ -1319,3 +1319,76 @@ dialog .dialog-actions {
 #highway-control {
   margin-left: auto;
 }
+
+.github-banner {
+  max-width: 1600px;
+  margin: 12px auto;
+  padding: 12px 24px;
+  background: #edf1e8;
+  color: #4f6347;
+  border: 1px solid #d9e0d0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.github-banner span {
+  flex: 1;
+}
+#github-dialog {
+  width: min(620px, calc(100vw - 32px));
+  max-height: 90vh;
+  overflow: auto;
+}
+#github-dialog label {
+  display: block;
+  margin: 16px 0;
+  font-size: 13px;
+}
+#github-dialog input {
+  width: 100%;
+  margin-top: 7px;
+  padding: 11px;
+  border: 1px solid #cdd5c6;
+  border-radius: 8px;
+}
+.github-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0;
+}
+.github-buttons a {
+  padding: 10px;
+  color: #4f6347;
+}
+#github-status.error {
+  color: #9d3f2f;
+}
+#github-dialog details {
+  margin: 20px 0;
+  font-size: 13px;
+}
+#github-dialog summary {
+  cursor: pointer;
+}
+@media (max-width: 900px) {
+  .backup-actions {
+    flex-wrap: wrap;
+  }
+  .header-copy {
+    display: none;
+  }
+}
+#github-dialog .github-public {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  line-height: 1.6;
+}
+#github-dialog .github-public input {
+  width: auto;
+  margin-top: 4px;
+}

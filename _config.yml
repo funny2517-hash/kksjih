@@ -1,0 +1,10 @@
+# Branch-based Pages must not publish uploaded travel data with the app.
+# Public Git repositories still expose their files through GitHub itself.
+exclude:
+  - travel-data
+  - src
+  - scripts
+  - tests
+  - node_modules
+  - package.json
+  - package-lock.json
