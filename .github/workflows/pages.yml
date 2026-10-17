@@ -13,26 +13,7 @@ concurrency:
   group: pages
   cancel-in-progress: true
 jobs:
-  detect-source:
-    runs-on: ubuntu-latest
-    outputs:
-      actions: ${{ steps.source.outputs.actions }}
-    steps:
-      - name: Preserve the existing Pages source
-        id: source
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          build_type="$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq .build_type)"
-          if [ "$build_type" = "workflow" ]; then
-            echo "actions=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "actions=false" >> "$GITHUB_OUTPUT"
-            echo "Branch-based Pages publishes the committed standalone files."
-          fi
   deploy:
-    needs: detect-source
-    if: needs.detect-source.outputs.actions == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

@@ -123,11 +123,11 @@ Vite + JavaScript, D3(실제 GeoJSON 투영·SVG·확대/축소), idb(IndexedDB)
 
 ### 이미 설정한 GitHub Pages 사용
 
-`Settings → Pages`의 기존 Source를 바꾸지 않아도 되도록 다음 형태를 지원합니다.
+GitHub Actions 자동 배포를 쓰려면 `Settings → Pages → Build and deployment → Source`를 **GitHub Actions**로 선택하세요. 사이트를 새로 만들거나 Netlify로 옮길 필요는 없습니다. 다음 배포 파일도 제공합니다.
 
 - **Deploy from a branch · main · /(root)**: 루트 페이지가 완성본 `downloads/index.html`로 이동합니다. 원본 JS를 브라우저에서 그대로 실행하지 않습니다. 루트의 `_config.yml`은 사진용 `travel-data`를 Pages 빌드에서 제외합니다.
 - **Deploy from a branch · main · /docs**: 완성본 `docs/index.html`이 바로 실행됩니다. 두 완성본은 같은 파일로 갱신합니다.
-- **GitHub Actions**: `.github/workflows/pages.yml`이 빌드한 단일 HTML만 Pages에 배포합니다. 워크플로는 기존 Pages Source를 조회해 Actions 방식일 때만 배포하고, 브랜치 방식의 기존 설정은 바꾸지 않습니다. 사진 업로드(`travel-data/**`)만 바뀐 경우에는 이 워크플로를 실행하지 않습니다.
+- **GitHub Actions**: `.github/workflows/pages.yml`이 빌드한 단일 HTML만 Pages에 배포합니다. 별도의 Pages Source 조회 작업 없이 공식 configure-pages → upload-pages-artifact → deploy-pages 순서로 배포합니다. 저장소 설정의 Source는 GitHub Actions여야 합니다. 사진 업로드(`travel-data/**`)만 바뀐 경우에는 이 워크플로를 실행하지 않습니다.
 
 기본 주소는 `https://funny2517-hash.github.io/kksjih/` 형식입니다. **정확한 게시 주소와 배포 결과는 Settings → Pages의 “Visit site”에서 확인**하세요. 커스텀 도메인을 설정했다면 그 주소를 사용합니다. 로컬 기능은 경로와 상관없이 같은 원본의 IndexedDB를 쓰며, 다른 도메인에서 가져온 기록은 백업/복원이 필요합니다.
 
