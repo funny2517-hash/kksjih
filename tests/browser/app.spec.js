@@ -243,15 +243,13 @@ test("large photos save, visible progress, storage error keeps draft and retry w
   });
   const buffer = Buffer.from(base64, "base64");
   expect(buffer.length).toBeGreaterThan(1000000);
-  await page
-    .locator("#photos")
-    .setInputFiles(
-      Array.from({ length: 6 }, (_, i) => ({
-        name: `trip-${i}.jpg`,
-        mimeType: "image/jpeg",
-        buffer,
-      })),
-    );
+  await page.locator("#photos").setInputFiles(
+    Array.from({ length: 6 }, (_, i) => ({
+      name: `trip-${i}.jpg`,
+      mimeType: "image/jpeg",
+      buffer,
+    })),
+  );
   await expect(page.locator("#photo-previews img")).toHaveCount(6, {
     timeout: 15000,
   });
@@ -290,4 +288,83 @@ test("empty date shows an inline error instead of a silent native validation fai
   await page.locator("#save-record").click();
   await expect(page.locator("#form-status")).toContainText("방문 날짜");
   await expect(page.locator("#save-record")).toBeEnabled();
+});
+
+test("Pyeongtaek photo paints the actual puzzle interior, survives zoom/reload and clears on deletion", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator('[data-place="province-31"]').click();
+  await page.locator("#search").fill("평택시");
+  const place = page.locator("[data-place]");
+  const id = await place.getAttribute("data-place");
+  await place.click();
+  await page.locator("#new-record").click();
+  const base64 = await page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 200;
+    c.height = 100;
+    const x = c.getContext("2d");
+    x.fillStyle = "rgb(220,40,60)";
+    x.fillRect(0, 0, 100, 100);
+    x.fillStyle = "rgb(40,100,220)";
+    x.fillRect(100, 0, 100, 100);
+    return c.toDataURL("image/png").split(",")[1];
+  });
+  await page
+    .locator("#photos")
+    .setInputFiles({
+      name: "red-blue.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(base64, "base64"),
+    });
+  await expect(page.locator("#photo-previews img")).toHaveCount(1);
+  await page.locator("#save-record").click();
+  await expect(page.locator(".memory img")).toHaveCount(1);
+  const region = page.locator(`[data-region="${id}"]`);
+  await expect
+    .poll(() => region.evaluate((el) => getComputedStyle(el).fill))
+    .toContain("photo-");
+  await page.locator("#reset-map").click();
+  await page.waitForTimeout(500);
+  async function assertPaint() {
+    const shot = await region.screenshot();
+    const count = await page.evaluate(async (base64) => {
+      const image = new Image();
+      image.src = "data:image/png;base64," + base64;
+      await image.decode();
+      const c = document.createElement("canvas");
+      c.width = image.width;
+      c.height = image.height;
+      const x = c.getContext("2d");
+      x.drawImage(image, 0, 0);
+      const rgba = x.getImageData(0, 0, c.width, c.height).data;
+      let count = 0;
+      for (let i = 0; i < rgba.length; i += 4)
+        if (
+          (Math.abs(rgba[i] - 220) < 12 &&
+            Math.abs(rgba[i + 1] - 40) < 12 &&
+            Math.abs(rgba[i + 2] - 60) < 12) ||
+          (Math.abs(rgba[i] - 40) < 12 &&
+            Math.abs(rgba[i + 1] - 100) < 12 &&
+            Math.abs(rgba[i + 2] - 220) < 12)
+        )
+          count++;
+      return count;
+    }, shot.toString("base64"));
+    expect(count).toBeGreaterThan(100);
+  }
+  await assertPaint();
+  await page.locator("#zoom-in").click();
+  await page.waitForTimeout(400);
+  await assertPaint();
+  await page.reload();
+  await page.locator('[data-place="province-31"]').click();
+  await assertPaint();
+  await page.locator("#search").fill("평택시");
+  await page.locator("[data-place]").click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "삭제", exact: true }).click();
+  await expect(region).toHaveAttribute("fill", "#fdfdf9");
+  await expect(page.locator("#map defs pattern")).toHaveCount(0);
 });

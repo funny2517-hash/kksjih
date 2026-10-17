@@ -471,7 +471,7 @@ function updateMap() {
         ? `url(#photo-${f.properties.code})`
         : rs.length
           ? "#aec1a0"
-          : null;
+          : "#fdfdf9";
     })
     .classed("selected", (f) => selected === f.id)
     .classed("muted", (f) => tab === "rest" || !matches(targets.get(f.id)));
