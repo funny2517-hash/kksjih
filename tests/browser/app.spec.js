@@ -572,10 +572,15 @@ test("Ulleung and Dokdo use distinct true positions and Dokdo remains in bounds 
   await page.setViewportSize({ width: 1280, height: 720 });
   await d.click();
   await expect(page.locator("#map-breadcrumb")).toContainText("경상북도");
+  await expect(page.locator(".detail-heading h2")).toContainText("독도");
+  await expect(page.locator("#new-record")).toBeVisible();
   await expect(d).toBeVisible();
   await positions();
   await d.click();
-  await expect(page.locator(".detail-heading h2")).toContainText("울릉군");
+  await expect(page.locator(".detail-heading h2")).toContainText("독도");
+  await expect(page.locator(".detail-heading .eyebrow")).toContainText(
+    "울릉군",
+  );
   await expect(page.locator("#new-record")).toBeVisible();
   await page.locator("#reset-map").click();
   await page.waitForTimeout(500);
@@ -588,4 +593,46 @@ test("Ulleung and Dokdo use distinct true positions and Dokdo remains in bounds 
   await expect(page.locator(".island-callouts g")).toHaveCount(0);
   await page.locator("#labels").check();
   await expect(d).toBeVisible();
+});
+
+test("single click on Dokdo label or native shortcuts immediately opens a record panel, including touch", async ({
+  page,
+  browser,
+}) => {
+  await page.goto("/");
+  await page.locator('[data-island="dokdo"] text').click();
+  await expect(page.locator(".detail-heading h2")).toContainText("독도");
+  await expect(page.locator("#new-record")).toBeVisible();
+  await expect(page.locator("#notice")).toContainText("독도를 선택");
+  await page.locator('[data-island-open="ulleung"]').click();
+  await expect(page.locator(".detail-heading h2")).toContainText("울릉도");
+  await page.locator('[data-island-open="dokdo"]').click();
+  await page.locator("#new-record").click();
+  await expect(page.getByLabel("한 줄 제목")).toHaveValue("독도 여행");
+  await page.getByLabel("여행 메모").fill("독도에서 본 바다");
+  page.once("dialog", (d) => d.dismiss());
+  await page.locator('[data-island-open="ulleung"]').click();
+  await expect(page.locator(".detail-heading h2")).toContainText("독도");
+  await expect(page.getByLabel("여행 메모")).toHaveValue("독도에서 본 바다");
+  await page.locator("#save-record").click();
+  await expect(page.locator(".memory")).toContainText("독도에서 본 바다");
+  await expect(page.locator("#region-count")).toHaveText("1");
+  await page.screenshot({
+    path: "/tmp/kksjih-dokdo-click.png",
+    fullPage: true,
+  });
+  const touch = await browser.newContext({
+    viewport: { width: 1024, height: 768 },
+    hasTouch: true,
+  });
+  try {
+    const p = await touch.newPage();
+    await p.goto("http://127.0.0.1:5173");
+    await p.locator('[data-island="dokdo"] circle').tap();
+    await expect(p.locator(".detail-heading h2")).toContainText("독도");
+    await p.locator('[data-island-open="ulleung"]').tap();
+    await expect(p.locator(".detail-heading h2")).toContainText("울릉도");
+  } finally {
+    await touch.close();
+  }
 });

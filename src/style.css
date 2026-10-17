@@ -1256,3 +1256,40 @@ dialog .dialog-actions {
 .island-callouts g:focus-visible {
   outline: 2px solid #657e4d;
 }
+.island-shortcuts {
+  position: absolute;
+  right: 20px;
+  top: 78px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+}
+.island-shortcuts button {
+  font-size: 12px;
+  padding: 9px 13px;
+  border-color: #cbd9bd;
+  color: #456332;
+  background: #fffef9;
+  box-shadow: 0 2px 7px #344c2110;
+}
+.island-shortcuts button[aria-pressed="true"] {
+  background: #e3edd8;
+  border-color: #7f9b65;
+  font-weight: 600;
+}
+.detail-heading .island-record-note {
+  font-size: 10px;
+  line-height: 1.7;
+  color: #879779;
+  margin: 10px 0 15px;
+}
+@media (max-width: 550px) {
+  .island-shortcuts {
+    top: 105px;
+    right: 10px;
+  }
+  .island-shortcuts button {
+    font-size: 10px;
+    padding: 7px 9px;
+  }
+}

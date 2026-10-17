@@ -35,6 +35,7 @@ const escape = (s) =>
       ],
   );
 let currentProvince = null;
+let selectedIsland = null;
 let activeRestPoint = null;
 let geo,
   dokdo,
@@ -109,7 +110,7 @@ async function start() {
   <header><a class="brand" href="" aria-label="둘의 지도 홈"><span class="brand-mark">◒</span><div>둘의 지도<small>OUR LITTLE KOREA</small></div></a><div class="header-copy">함께 다녀온 곳이, 우리의 지도가 돼요.</div><div class="backup-actions"><span class="local-badge">● 이 브라우저에 저장</span><button id="backup">↓ 백업</button><button id="restore">↑ 복원</button><input id="restore-file" type="file" accept="application/json,.json" hidden></div></header>
   <section class="topline"><div><span class="eyebrow">ONE TRIP, ONE PIECE</span><h1>차곡차곡, 우리 여행 조각</h1><p>낯선 도시의 설렘부터 휴게소의 작은 추억까지.</p></div><div class="stats"><div><strong id="region-count">0</strong><span>방문한 지역</span></div><div><strong id="rest-count">0</strong><span>들른 휴게소</span></div><div><strong id="memory-count">0</strong><span>함께 쓴 기록</span></div></div></section>
   <main><aside class="explore"><div class="tabs" role="tablist" aria-label="지도 종류"><button role="tab" id="region-tab" aria-selected="true">전국 여행</button><button role="tab" id="rest-tab" aria-selected="false">휴게소</button></div><div class="explore-intro"><h2 id="explore-title">우리의 다음 여행지는?</h2><p id="explore-copy">지도에서 지역을 선택해 추억을 남겨요.</p></div><label class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="시·도 검색" aria-label="지역 또는 휴게소 검색"></label><label class="route-filter" hidden>고속도로 노선<select id="route"><option value="">모든 노선</option></select></label><label class="visited-filter"><input id="visited-only" type="checkbox"> 방문한 곳만 보기</label><div class="list-heading"><span id="list-caption">전국 시·도</span><span id="list-count"></span></div><div id="place-list" class="place-list"></div><div class="sidebar-note">사진 한 장이 여행의 한 조각.<br>우리만의 대한민국을 완성해 보세요.</div></aside>
-  <section class="map-panel" aria-label="대한민국 여행 지도"><div class="map-top"><div><span class="live-dot"></span><b id="map-title">대한민국 여행 퍼즐</b><span id="map-subtitle">시·도 → 시·군·구</span></div><label><input type="checkbox" id="labels" checked> 지역명</label></div><nav id="map-breadcrumb" aria-label="행정구역 탐색 경로"></nav><svg id="map" viewBox="0 0 900 820" role="img" aria-label="실제 대한민국 행정구역 지도. 마우스 휠로 확대하고 드래그로 이동할 수 있습니다."></svg><div class="map-watermark">OUR<br>LITTLE<br>KOREA<span>함께 채우는 여행 지도</span></div><div class="map-controls"><button id="zoom-in" aria-label="지도 확대">＋</button><button id="zoom-out" aria-label="지도 축소">−</button><button id="reset-map" aria-label="전국 지도 보기">⌂</button></div><div class="map-legend"><span><i class="unvisited"></i>기다리는 여행</span><span><i class="visited"></i>우리의 발자국</span><span id="rest-shape-legend" hidden>□ 방향별 시설 · ○ 단일 시설</span><b id="zoom-level">100%</b></div><div id="map-tooltip" hidden></div></section>
+  <section class="map-panel" aria-label="대한민국 여행 지도"><div class="map-top"><div><span class="live-dot"></span><b id="map-title">대한민국 여행 퍼즐</b><span id="map-subtitle">시·도 → 시·군·구</span></div><label><input type="checkbox" id="labels" checked> 지역명</label></div><nav id="map-breadcrumb" aria-label="행정구역 탐색 경로"></nav><nav class="island-shortcuts" aria-label="섬 바로가기"><button type="button" data-island-open="ulleung">울릉도</button><button type="button" data-island-open="dokdo">독도</button></nav><svg id="map" viewBox="0 0 900 820" role="img" aria-label="실제 대한민국 행정구역 지도. 마우스 휠로 확대하고 드래그로 이동할 수 있습니다."></svg><div class="map-watermark">OUR<br>LITTLE<br>KOREA<span>함께 채우는 여행 지도</span></div><div class="map-controls"><button id="zoom-in" aria-label="지도 확대">＋</button><button id="zoom-out" aria-label="지도 축소">−</button><button id="reset-map" aria-label="전국 지도 보기">⌂</button></div><div class="map-legend"><span><i class="unvisited"></i>기다리는 여행</span><span><i class="visited"></i>우리의 발자국</span><span id="rest-shape-legend" hidden>□ 방향별 시설 · ○ 단일 시설</span><b id="zoom-level">100%</b></div><div id="map-tooltip" hidden></div></section>
   <aside id="details" class="details" aria-label="여행 기록"></aside></main>
   <footer><span>둘만의 순간을, 지도 위에 오래도록.</span><button id="data-info">지도 데이터·저장 안내 ↗</button></footer>
   <div id="notice" role="status" hidden></div>
@@ -123,6 +124,12 @@ async function start() {
   renderDetails();
 }
 function bind() {
+  document
+    .querySelectorAll("[data-island-open]")
+    .forEach(
+      (button) =>
+        (button.onclick = () => openIsland(button.dataset.islandOpen)),
+    );
   $("#region-tab").onclick = () => changeTab("region");
   $("#rest-tab").onclick = () => changeTab("rest");
   $("#search").oninput = (e) => {
@@ -250,6 +257,7 @@ function navigateProvince(code) {
   if (!canLeave()) return;
   currentProvince = code;
   selected = null;
+  selectedIsland = null;
   activeRestPoint = null;
   editing = null;
   dirty = false;
@@ -261,6 +269,15 @@ function navigateProvince(code) {
   renderDetails();
 }
 function renderNavigation() {
+  $(".island-shortcuts").hidden = tab !== "region";
+  document
+    .querySelectorAll("[data-island-open]")
+    .forEach((button) =>
+      button.setAttribute(
+        "aria-pressed",
+        String(button.dataset.islandOpen === selectedIsland),
+      ),
+    );
   $("#rest-shape-legend").hidden = tab !== "rest";
   const nav = $("#map-breadcrumb");
   nav.hidden = tab !== "region";
@@ -287,6 +304,7 @@ function changeTab(next) {
   if (tab === next || !canLeave()) return;
   tab = next;
   selected = null;
+  selectedIsland = null;
   activeRestPoint = null;
   editing = null;
   dirty = false;
@@ -367,6 +385,7 @@ function selectPlace(id, focus = false) {
   )
     activeRestPoint = restDirections(target)[0].id;
   selected = id;
+  selectedIsland = null;
   editing = null;
   dirty = false;
   renderList();
@@ -593,6 +612,27 @@ function updateLabels() {
     boxes.push(box);
   }
 }
+function openIsland(id) {
+  const landmark = landmarks.find((point) => point.id === id);
+  if (!landmark || !canLeave()) return;
+  selectedIsland = id;
+  currentProvince = "37";
+  selected = "region-37430";
+  activeRestPoint = null;
+  editing = null;
+  photos = [];
+  dirty = false;
+  query = "";
+  $("#search").value = "";
+  $("#map-tooltip").hidden = true;
+  fitScope();
+  update();
+  renderDetails();
+  $("#details").scrollTop = 0;
+  notify(
+    `${landmark.name}를 선택했어요. 오른쪽에서 사진과 메모를 남길 수 있어요.`,
+  );
+}
 function drawIslandCallouts(scale) {
   const boxes = [];
   if (tab === "region" && currentProvince && currentProvince !== "37")
@@ -614,11 +654,7 @@ function drawIslandCallouts(scale) {
       .attr("aria-label", landmark.name + " 실제 위치")
       .attr("tabindex", tab === "region" ? 0 : null);
     const open = () => {
-      if (tab === "region")
-        selectPlace(
-          currentProvince ? "region-37430" : "province-37",
-          Boolean(currentProvince),
-        );
+      if (tab === "region") openIsland(landmark.id);
     };
     group.on("click", open).on("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -695,6 +731,10 @@ function renderDetails() {
     return;
   }
   const t = targets.get(selected);
+  const island =
+    selected === "region-37430"
+      ? landmarks.find((point) => point.id === selectedIsland)
+      : null;
   const directions = t.type === "rest" ? restDirections(t) : [];
   if (
     directions.length &&
@@ -715,7 +755,7 @@ function renderDetails() {
   const directionHeading = activeDirection
     ? `<p class="active-direction">${escape(activeDirection.direction)}${activeDirection.destination ? " · " + escape(activeDirection.destination) + " 방향" : ""}</p>`
     : "";
-  el.innerHTML = `<div class="detail-heading"><span class="eyebrow">${escape(t.sub)}</span><h2>${escape(t.name)}<span>${rs.length ? "♥" : "♡"}</span></h2><p>${rs.length ? `${rs.length}번의 함께한 순간` : "아직 비어 있는 우리의 여행 조각"}</p>${directionTabs}${directionHeading}<button id="new-record" class="primary">＋ 새로운 추억 남기기</button></div><div id="editor"></div><div id="record-list">${rs.length ? rs.map((r) => `<article class="memory" data-record="${escape(r.id)}"><div class="memory-meta"><time>${escape(r.date.replaceAll("-", "."))}</time><span><button data-edit="${escape(r.id)}">수정</button><button data-delete="${escape(r.id)}">삭제</button></span></div><h3>${escape(r.title || "함께한 하루")}</h3>${r.photos.length ? `<div class="memory-photos">${r.photos.map((p, i) => `<button data-photo-record="${escape(r.id)}" data-photo-index="${i}" aria-label="여행 사진 ${i + 1} 크게 보기"><img src="${p}" alt="${escape(t.name)} 여행 사진 ${i + 1}" loading="lazy"></button>`).join("")}</div>` : ""}<p class="memo">${escape(r.memo)}</p></article>`).join("") : '<div class="no-memory">첫 번째 기록을 기다리고 있어요.<br>사진 없이 메모만 남겨도 좋아요.</div>'}</div>`;
+  el.innerHTML = `<div class="detail-heading"><span class="eyebrow">${escape(island ? t.sub + " · " + t.name : t.sub)}</span><h2>${escape(island ? island.name : t.name)}<span>${rs.length ? "♥" : "♡"}</span></h2><p>${rs.length ? `${rs.length}번의 함께한 순간` : "아직 비어 있는 우리의 여행 조각"}</p>${directionTabs}${directionHeading}${island ? '<p class="island-record-note">사진·메모는 울릉군 여행 기록으로 함께 저장돼요.</p>' : ""}<button id="new-record" class="primary">＋ 새로운 추억 남기기</button></div><div id="editor"></div><div id="record-list">${rs.length ? rs.map((r) => `<article class="memory" data-record="${escape(r.id)}"><div class="memory-meta"><time>${escape(r.date.replaceAll("-", "."))}</time><span><button data-edit="${escape(r.id)}">수정</button><button data-delete="${escape(r.id)}">삭제</button></span></div><h3>${escape(r.title || "함께한 하루")}</h3>${r.photos.length ? `<div class="memory-photos">${r.photos.map((p, i) => `<button data-photo-record="${escape(r.id)}" data-photo-index="${i}" aria-label="여행 사진 ${i + 1} 크게 보기"><img src="${p}" alt="${escape(t.name)} 여행 사진 ${i + 1}" loading="lazy"></button>`).join("")}</div>` : ""}<p class="memo">${escape(r.memo)}</p></article>`).join("") : '<div class="no-memory">첫 번째 기록을 기다리고 있어요.<br>사진 없이 메모만 남겨도 좋아요.</div>'}</div>`;
   if (directions.length)
     $("#record-list").setAttribute(
       "aria-label",
@@ -798,7 +838,7 @@ function openEditor(r) {
   photos = [...(r?.photos || [])];
   dirty = false;
   $("#editor").innerHTML =
-    `<form id="record-form" novalidate><div class="form-top"><b>${r ? "추억 수정하기" : "새로운 여행 기록"}</b><button type="button" id="cancel-editor" aria-label="기록 작성 취소">✕</button></div><label>방문 날짜<input name="date" type="date" required value="${escape(r?.date || today())}"></label><label>한 줄 제목<input name="title" maxlength="100" placeholder="우리의 어떤 하루였나요?" value="${escape(r?.title || "")}"></label><label>여행 메모<textarea name="memo" rows="4" maxlength="5000" placeholder="함께 본 풍경, 맛있었던 음식, 기억하고 싶은 마음…">${escape(r?.memo || "")}</textarea></label><label class="photo-upload">＋ 사진 추가 <span>최대 6장 · 장당 12MB</span><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="photo-previews"></div><p class="form-hint">사진은 긴 변 1600px로 줄여 이 브라우저에만 저장해요.</p><p id="form-status" class="form-status" role="status" aria-live="polite" hidden></p><button class="primary" id="save-record" type="submit">추억 저장하기</button></form>`;
+    `<form id="record-form" novalidate><div class="form-top"><b>${r ? "추억 수정하기" : "새로운 여행 기록"}</b><button type="button" id="cancel-editor" aria-label="기록 작성 취소">✕</button></div><label>방문 날짜<input name="date" type="date" required value="${escape(r?.date || today())}"></label><label>한 줄 제목<input name="title" maxlength="100" placeholder="우리의 어떤 하루였나요?" value="${escape(r?.title ?? (selectedIsland ? landmarks.find((point) => point.id === selectedIsland).name + " 여행" : ""))}"></label><label>여행 메모<textarea name="memo" rows="4" maxlength="5000" placeholder="함께 본 풍경, 맛있었던 음식, 기억하고 싶은 마음…">${escape(r?.memo || "")}</textarea></label><label class="photo-upload">＋ 사진 추가 <span>최대 6장 · 장당 12MB</span><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="photo-previews"></div><p class="form-hint">사진은 긴 변 1600px로 줄여 이 브라우저에만 저장해요.</p><p id="form-status" class="form-status" role="status" aria-live="polite" hidden></p><button class="primary" id="save-record" type="submit">추억 저장하기</button></form>`;
   if (t.type === "rest") {
     const options = restDirections(t);
     const pointId = r?.target || activeRestPoint;
