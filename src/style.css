@@ -1293,3 +1293,29 @@ dialog .dialog-actions {
     padding: 7px 9px;
   }
 }
+
+/* Roads stay behind the facilities: one quiet color, constant width at any zoom. */
+.highways {
+  pointer-events: none;
+}
+.highways path {
+  fill: none;
+  stroke: #9aa995;
+  stroke-width: 1.5px;
+  stroke-opacity: 0.68;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.markers .rest-marker.secondary {
+  opacity: 0.42;
+}
+.markers .rest-marker:hover,
+.markers .rest-marker.selected {
+  opacity: 1;
+  stroke-width: 2.5;
+  paint-order: stroke fill;
+}
+#highway-control {
+  margin-left: auto;
+}

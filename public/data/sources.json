@@ -49,5 +49,14 @@
       ]
     },
     "verification": "Each reference point is inside its islet polygon. Nearest sampled shoreline vertices are ~87.64 km from Ulleung, southeast bearing. Coordinates remain within 131.8632–131.8713 E, 37.2383–37.2443 N."
+  },
+  "highways": {
+    "provider": "Natural Earth 1:10m roads",
+    "source": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_10m_roads.geojson",
+    "sha256": "66a0c7b438e92fd124822cc5921cfa11042f48c294ade5e0f03f2c6640fd0248",
+    "license": "Public domain; https://www.naturalearthdata.com/about/terms-of-use/",
+    "processing": "Keep expressway=1 original LineStrings within Korean bounding box whose middle vertex lies within a province. No joining, interpolation or rest-area-derived geometry. scripts/prepare-highways.mjs checks source checksum.",
+    "count": 134,
+    "limitations": "Historical generalized 1:10 million roads, not current navigation geometry. Missing recent roads and ramps; no route identifiers. Route filters apply only to rest-area markers, not road lines."
   }
 }

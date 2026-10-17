@@ -38,6 +38,7 @@ let currentProvince = null;
 let selectedIsland = null;
 let activeRestPoint = null;
 let geo,
+  highways,
   dokdo,
   landmarks,
   rests,
@@ -62,6 +63,7 @@ let svg,
   regionPaths,
   labelLayer,
   markerLayer,
+  highwayLayer,
   islandLayer;
 function notify(message, error = false) {
   const el = $("#notice");
@@ -88,10 +90,13 @@ async function start() {
     fetch("/data/hierarchy.geojson"),
     fetch("/data/rest-areas.json"),
     fetch("/data/dokdo.geojson"),
+    fetch("/data/highways.geojson"),
   ]);
   if (responses.some((r) => !r.ok))
     throw new Error("지도 데이터를 불러오지 못했습니다.");
-  [geo, rests, dokdo] = await Promise.all(responses.map((r) => r.json()));
+  [geo, rests, dokdo, highways] = await Promise.all(
+    responses.map((r) => r.json()),
+  );
   landmarks = islandLandmarks(geo, dokdo);
   rests = mergeRestAreas(rests);
   records = await loadRecords();
@@ -110,11 +115,11 @@ async function start() {
   <header><a class="brand" href="" aria-label="둘의 지도 홈"><span class="brand-mark">◒</span><div>둘의 지도<small>OUR LITTLE KOREA</small></div></a><div class="header-copy">함께 다녀온 곳이, 우리의 지도가 돼요.</div><div class="backup-actions"><span class="local-badge">● 이 브라우저에 저장</span><button id="backup">↓ 백업</button><button id="restore">↑ 복원</button><input id="restore-file" type="file" accept="application/json,.json" hidden></div></header>
   <section class="topline"><div><span class="eyebrow">ONE TRIP, ONE PIECE</span><h1>차곡차곡, 우리 여행 조각</h1><p>낯선 도시의 설렘부터 휴게소의 작은 추억까지.</p></div><div class="stats"><div><strong id="region-count">0</strong><span>방문한 지역</span></div><div><strong id="rest-count">0</strong><span>들른 휴게소</span></div><div><strong id="memory-count">0</strong><span>함께 쓴 기록</span></div></div></section>
   <main><aside class="explore"><div class="tabs" role="tablist" aria-label="지도 종류"><button role="tab" id="region-tab" aria-selected="true">전국 여행</button><button role="tab" id="rest-tab" aria-selected="false">휴게소</button></div><div class="explore-intro"><h2 id="explore-title">우리의 다음 여행지는?</h2><p id="explore-copy">지도에서 지역을 선택해 추억을 남겨요.</p></div><label class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="시·도 검색" aria-label="지역 또는 휴게소 검색"></label><label class="route-filter" hidden>고속도로 노선<select id="route"><option value="">모든 노선</option></select></label><label class="visited-filter"><input id="visited-only" type="checkbox"> 방문한 곳만 보기</label><div class="list-heading"><span id="list-caption">전국 시·도</span><span id="list-count"></span></div><div id="place-list" class="place-list"></div><div class="sidebar-note">사진 한 장이 여행의 한 조각.<br>우리만의 대한민국을 완성해 보세요.</div></aside>
-  <section class="map-panel" aria-label="대한민국 여행 지도"><div class="map-top"><div><span class="live-dot"></span><b id="map-title">대한민국 여행 퍼즐</b><span id="map-subtitle">시·도 → 시·군·구</span></div><label><input type="checkbox" id="labels" checked> 지역명</label></div><nav id="map-breadcrumb" aria-label="행정구역 탐색 경로"></nav><nav class="island-shortcuts" aria-label="섬 바로가기"><button type="button" data-island-open="ulleung">울릉도</button><button type="button" data-island-open="dokdo">독도</button></nav><svg id="map" viewBox="0 0 900 820" role="img" aria-label="실제 대한민국 행정구역 지도. 마우스 휠로 확대하고 드래그로 이동할 수 있습니다."></svg><div class="map-watermark">OUR<br>LITTLE<br>KOREA<span>함께 채우는 여행 지도</span></div><div class="map-controls"><button id="zoom-in" aria-label="지도 확대">＋</button><button id="zoom-out" aria-label="지도 축소">−</button><button id="reset-map" aria-label="전국 지도 보기">⌂</button></div><div class="map-legend"><span><i class="unvisited"></i>기다리는 여행</span><span><i class="visited"></i>우리의 발자국</span><span id="rest-shape-legend" hidden>□ 방향별 시설 · ○ 단일 시설</span><b id="zoom-level">100%</b></div><div id="map-tooltip" hidden></div></section>
+  <section class="map-panel" aria-label="대한민국 여행 지도"><div class="map-top"><div><span class="live-dot"></span><b id="map-title">대한민국 여행 퍼즐</b><span id="map-subtitle">시·도 → 시·군·구</span></div><label id="highway-control" hidden><input type="checkbox" id="highways" checked> 고속도로</label><label><input type="checkbox" id="labels" checked> 지역명</label></div><nav id="map-breadcrumb" aria-label="행정구역 탐색 경로"></nav><nav class="island-shortcuts" aria-label="섬 바로가기"><button type="button" data-island-open="ulleung">울릉도</button><button type="button" data-island-open="dokdo">독도</button></nav><svg id="map" viewBox="0 0 900 820" role="img" aria-label="실제 대한민국 행정구역 지도. 마우스 휠로 확대하고 드래그로 이동할 수 있습니다."></svg><div class="map-watermark">OUR<br>LITTLE<br>KOREA<span>함께 채우는 여행 지도</span></div><div class="map-controls"><button id="zoom-in" aria-label="지도 확대">＋</button><button id="zoom-out" aria-label="지도 축소">−</button><button id="reset-map" aria-label="전국 지도 보기">⌂</button></div><div class="map-legend"><span><i class="unvisited"></i>기다리는 여행</span><span><i class="visited"></i>우리의 발자국</span><span id="rest-shape-legend" hidden>□ 방향별 시설 · ○ 단일 시설</span><b id="zoom-level">100%</b></div><div id="map-tooltip" hidden></div></section>
   <aside id="details" class="details" aria-label="여행 기록"></aside></main>
   <footer><span>둘만의 순간을, 지도 위에 오래도록.</span><button id="data-info">지도 데이터·저장 안내 ↗</button></footer>
   <div id="notice" role="status" hidden></div>
-  <dialog id="info-dialog"><h2>실제 지도로 만나는 대한민국</h2><p>행정경계: 통계청(KOSTAT) 기반 South Korea Maps의 <b>2018년 경계 기반 시·도 17개 → 최종 시·군·구 229개</b>를 표시합니다. 도의 일반시 안에 나뉜 구는 실제 경계를 합쳐 시로 표시합니다. 사진은 최종 지역에만 등록합니다. 원본을 형태 보존 방식으로 단순화했습니다. 누락된 독도 동·서도는 별도의 실제 2018년 SGIS 경계로 보완했으며, 울릉도·독도를 이동시킨 삽입지도는 사용하지 않습니다. 작은 점과 연결선은 위치 식별용 표식입니다. 최신 행정구역과 차이가 있을 수 있습니다.</p><p>휴게소: 공개 저장소 rest_area_main의 위치 데이터 <b>210개 원본을 ${rests.length}곳으로 통합</b>해 표시합니다. 같은 노선·이름의 상·하행은 네모 지점 하나로 표시하며, 선택하면 방향 탭별로 사진과 기록을 따로 저장합니다. 단일 시설은 동그라미입니다. 대표 위치는 원본 좌표 중 하나를 사용하며, 전국 모든 휴게소 및 최신 개통·폐쇄를 보장하지 않습니다. 임의 생성한 좌표는 없습니다.</p><p>사진과 기록은 이 기기·브라우저의 IndexedDB에 저장됩니다. 서버 업로드나 기기 간 자동 동기화는 없습니다. 브라우저 데이터 삭제·시크릿 모드에서는 소실될 수 있으므로 정기적으로 백업하세요. 사진은 긴 변 1600px JPEG로 저장됩니다.</p><p><a href="https://github.com/southkorea/southkorea-maps" target="_blank" rel="noreferrer">경계 데이터 출처</a> · <a href="https://github.com/kmj381900-debug/rest_area_main" target="_blank" rel="noreferrer">휴게소 데이터 출처</a></p><p class="data-attribution">독도 경계: 통계청 SGIS 공공누리 제1유형 자료를 가공한 vuski/admdongkor, CC BY 4.0. <a href="https://github.com/vuski/admdongkor" target="_blank" rel="noreferrer">출처</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">라이선스</a></p><button class="primary" data-close>확인</button></dialog>
+  <dialog id="info-dialog"><h2>실제 지도로 만나는 대한민국</h2><p>행정경계: 통계청(KOSTAT) 기반 South Korea Maps의 <b>2018년 경계 기반 시·도 17개 → 최종 시·군·구 229개</b>를 표시합니다. 도의 일반시 안에 나뉜 구는 실제 경계를 합쳐 시로 표시합니다. 사진은 최종 지역에만 등록합니다. 원본을 형태 보존 방식으로 단순화했습니다. 누락된 독도 동·서도는 별도의 실제 2018년 SGIS 경계로 보완했으며, 울릉도·독도를 이동시킨 삽입지도는 사용하지 않습니다. 작은 점과 연결선은 위치 식별용 표식입니다. 최신 행정구역과 차이가 있을 수 있습니다.</p><p>휴게소: 공개 저장소 rest_area_main의 위치 데이터 <b>210개 원본을 ${rests.length}곳으로 통합</b>해 표시합니다. 같은 노선·이름의 상·하행은 네모 지점 하나로 표시하며, 선택하면 방향 탭별로 사진과 기록을 따로 저장합니다. 단일 시설은 동그라미입니다. 대표 위치는 원본 좌표 중 하나를 사용하며, 전국 모든 휴게소 및 최신 개통·폐쇄를 보장하지 않습니다. 임의 생성한 좌표는 없습니다.</p><p>고속도로 선: Natural Earth의 실제 도로 형상 중 expressway 분류를 사용합니다(퍼블릭 도메인). 전국 흐름을 보여주는 축척 1:1천만의 과거 개략 데이터이며 최신 개통 구간·램프·상세 선형은 누락될 수 있습니다. 휴게소 좌표를 이어 만든 선이 아닙니다. 노선 번호 정보가 없어 노선 필터는 휴게소에만 적용됩니다. <a href="https://www.naturalearthdata.com/about/terms-of-use/" target="_blank" rel="noreferrer">출처·이용 조건</a></p><p>사진과 기록은 이 기기·브라우저의 IndexedDB에 저장됩니다. 서버 업로드나 기기 간 자동 동기화는 없습니다. 브라우저 데이터 삭제·시크릿 모드에서는 소실될 수 있으므로 정기적으로 백업하세요. 사진은 긴 변 1600px JPEG로 저장됩니다.</p><p><a href="https://github.com/southkorea/southkorea-maps" target="_blank" rel="noreferrer">경계 데이터 출처</a> · <a href="https://github.com/kmj381900-debug/rest_area_main" target="_blank" rel="noreferrer">휴게소 데이터 출처</a></p><p class="data-attribution">독도 경계: 통계청 SGIS 공공누리 제1유형 자료를 가공한 vuski/admdongkor, CC BY 4.0. <a href="https://github.com/vuski/admdongkor" target="_blank" rel="noreferrer">출처</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">라이선스</a></p><button class="primary" data-close>확인</button></dialog>
   <dialog id="restore-dialog"><h2>여행 기록을 복원할까요?</h2><p id="restore-summary"></p><p>기존 기록을 유지하며 추가합니다. 같은 ID의 기록은 백업 내용으로 덮어씁니다. 복원 전 현재 기록을 백업해 두세요.</p><div class="dialog-actions"><button data-close>취소</button><button id="confirm-restore" class="primary">복원하기</button></div></dialog>
   <dialog id="photo-dialog"><button data-close aria-label="사진 닫기">✕ 닫기</button><img id="large-photo" alt="여행 사진 크게 보기"></dialog>`;
   bind();
@@ -151,6 +156,7 @@ function bind() {
     updateMap();
   };
   $("#labels").onchange = updateLabels;
+  $("#highways").onchange = updateMap;
   $("#zoom-in").onclick = () =>
     svg.transition().duration(250).call(zoom.scaleBy, 1.6);
   $("#zoom-out").onclick = () =>
@@ -279,6 +285,7 @@ function renderNavigation() {
       ),
     );
   $("#rest-shape-legend").hidden = tab !== "rest";
+  $("#highway-control").hidden = tab !== "rest";
   const nav = $("#map-breadcrumb");
   nav.hidden = tab !== "region";
   const province = targets.get("province-" + currentProvince);
@@ -431,6 +438,10 @@ function buildMap() {
   svg.append("defs");
   g = svg.append("g");
   g.append("g").attr("class", "regions");
+  highwayLayer = g
+    .append("g")
+    .attr("class", "highways")
+    .attr("aria-hidden", "true");
   markerLayer = g.append("g").attr("class", "markers");
   labelLayer = svg
     .append("g")
@@ -521,6 +532,11 @@ function updateMap() {
     })
     .classed("selected", (f) => selected === f.id)
     .classed("muted", (f) => tab === "rest" || !matches(targets.get(f.id)));
+  highwayLayer
+    .selectAll("path")
+    .data(tab === "rest" && $("#highways").checked ? highways.features : [])
+    .join("path")
+    .attr("d", path);
   markerLayer
     .selectAll(".rest-marker")
     .data(
@@ -535,12 +551,18 @@ function updateMap() {
       d3
         .symbol()
         .type(r.points.length > 1 ? d3.symbolSquare : d3.symbolCircle)
-        .size(r.points.length > 1 ? 144 : Math.PI * 36)(),
+        .size(r.points.length > 1 ? 100 : Math.PI * 25)(),
     )
     .attr("transform", markerTransform)
     .attr("stroke-width", 1.5)
     .attr("fill", (r) => (listRecords(r.id).length ? "#c67764" : "#657c59"))
     .classed("selected", (r) => selected === r.id)
+    .classed(
+      "secondary",
+      (r) =>
+        targets.get(selected)?.type === "rest" &&
+        targets.get(selected).route !== r.route,
+    )
     .on("click", (e, r) => {
       e.stopPropagation();
       selectPlace(r.id);

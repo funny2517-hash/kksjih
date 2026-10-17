@@ -636,3 +636,29 @@ test("single click on Dokdo label or native shortcuts immediately opens a record
     await touch.close();
   }
 });
+
+test("actual highway context stays quiet, toggleable and behind direction markers", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator("[data-place]").first()).toBeVisible();
+  await expect(page.locator(".highways path")).toHaveCount(0);
+  await page.locator("#rest-tab").click();
+  await expect(page.locator(".highways path")).toHaveCount(134);
+  const line = page.locator(".highways path").first();
+  expect((await line.getAttribute("d")).length).toBeGreaterThan(20);
+  await expect(line).toHaveCSS("pointer-events", "none");
+  await expect(line).toHaveCSS("vector-effect", "non-scaling-stroke");
+  await expect(page.locator(".rest-marker")).toHaveCount(128);
+  await page.locator('[data-rest="rest-4"]').click();
+  await expect(page.locator('[data-direction-point="rest-4"]')).toBeVisible();
+  await expect(page.locator('[data-direction-point="rest-5"]')).toBeVisible();
+  expect(await page.locator(".rest-marker.secondary").count()).toBeGreaterThan(0);
+  await page.locator("#highways").uncheck();
+  await expect(page.locator(".highways path")).toHaveCount(0);
+  await page.locator("#highways").check();
+  await page.locator("#route").selectOption("50");
+  await expect(page.locator(".highways path")).toHaveCount(134);
+  expect(await page.locator(".rest-marker").count()).toBeLessThan(128);
+  await page.locator("#region-tab").click();
+  await expect(page.locator(".highways path")).toHaveCount(0);
+  await expect(page.locator("#highway-control")).toBeHidden();
+});

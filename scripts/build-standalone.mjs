@@ -12,6 +12,7 @@ for (const filename of [
   "hierarchy.geojson",
   "rest-areas.json",
   "dokdo.geojson",
+  "highways.geojson",
 ]) {
   const needle = `fetch("/data/${filename}")`;
   if (!js.includes(needle)) throw Error(`Missing data fetch: ${filename}`);
