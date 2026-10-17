@@ -1,0 +1,26 @@
+{
+  "name": "our-korea-map",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test tests/*.test.js",
+    "test:e2e": "playwright test",
+    "build:standalone": "npm run build && node scripts/build-standalone.mjs",
+    "data:hierarchy": "node scripts/build-hierarchy.mjs"
+  },
+  "dependencies": {
+    "d3": "^7.9.0",
+    "idb": "^8.0.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "mapshaper": "^0.6.113",
+    "topojson-client": "^3.1.0",
+    "topojson-server": "^3.0.1",
+    "vite": "^7.1.0"
+  }
+}

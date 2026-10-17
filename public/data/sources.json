@@ -1,0 +1,26 @@
+{
+  "boundaries": {
+    "provider": "KOSTAT / southkorea/southkorea-maps",
+    "year": 2018,
+    "count": 250,
+    "source": "https://raw.githubusercontent.com/southkorea/southkorea-maps/fe65e05e549d04083e52f380a7e9166a8ea0a01e/kostat/2018/json/skorea-municipalities-2018-geo.json",
+    "sha256": "14c174c880d45c3c62aa97d9d4fc0d8605f0999560a4b70096567a8eb77f2ca9",
+    "processing": "mapshaper weighted 8% keep-shapes, precision=0.00001; D3 spherical winding normalization",
+    "limitations": "Historical census boundaries, not current legal administrative divisions. Simplified display geometry.",
+    "hierarchy": {
+      "provinceCount": 17,
+      "terminalCount": 229,
+      "processing": "Topological union of actual 2018 municipal polygons. General-city districts in provinces are dissolved to city boundaries; metropolitan districts remain terminal. All original region codes are retained as legacy aliases.",
+      "command": "npm run data:hierarchy"
+    }
+  },
+  "restAreas": {
+    "provider": "kmj381900-debug/rest_area_main public SQLite snapshot",
+    "count": 210,
+    "source": "https://raw.githubusercontent.com/kmj381900-debug/rest_area_main/78e6a7987c23aa22685e8461f2a42c8ed3c879e0/rest_areas.db",
+    "sha256": "3acbe972f32dc6349a110e5200e08d5705a673b8d56ed1124368d043df7681e9",
+    "processing": "Extract factual names, route numbers, directions and WGS84 latitude/longitude; no invented coordinates",
+    "limitations": "Third-party snapshot; original survey date and comprehensive coverage are not documented. Not a direct live Korea Expressway Corporation feed."
+  },
+  "downloadedAt": "2026-10-17"
+}
