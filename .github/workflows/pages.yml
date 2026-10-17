@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - 'travel-data/**'
+      - "travel-data/**"
   workflow_dispatch:
 permissions:
   contents: read
@@ -41,7 +41,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
       - run: npm ci
       - run: npm run build:standalone
