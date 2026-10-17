@@ -8,7 +8,11 @@ const root = path.resolve(
 let html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const jsFile = html.match(/src="([^"]+\.js)"/)[1];
 let js = fs.readFileSync(path.join(root, jsFile), "utf8");
-for (const filename of ["hierarchy.geojson", "rest-areas.json"]) {
+for (const filename of [
+  "hierarchy.geojson",
+  "rest-areas.json",
+  "dokdo.geojson",
+]) {
   const needle = `fetch("/data/${filename}")`;
   if (!js.includes(needle)) throw Error(`Missing data fetch: ${filename}`);
   const data = JSON.parse(

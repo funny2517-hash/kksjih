@@ -9,6 +9,21 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const source = JSON.parse(
   fs.readFileSync(path.join(root, "public/data/regions.geojson")),
 );
+// Supplement the omitted Dokdo islets with actual 2018 SGIS coastline rings.
+const dokdo = JSON.parse(
+  fs.readFileSync(path.join(root, "public/data/dokdo.geojson")),
+);
+const ulleung = source.features.find((f) => f.properties.code === "37430");
+if (!ulleung) throw Error("Missing Ulleung county");
+if (ulleung.geometry.type === "Polygon")
+  ulleung.geometry = {
+    type: "MultiPolygon",
+    coordinates: [ulleung.geometry.coordinates],
+  };
+if (ulleung.geometry.type !== "MultiPolygon")
+  throw Error("Unexpected county geometry");
+for (const feature of dokdo.features)
+  ulleung.geometry.coordinates.push(feature.geometry.coordinates);
 const topo = topology({ regions: source });
 const groups = new Map();
 for (const geometry of topo.objects.regions.geometries) {

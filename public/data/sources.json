@@ -27,5 +27,27 @@
       "recording": "82 paired groups use square markers and separate original-point direction/destination tabs. 46 single-point facilities use circle markers. Records retain original point IDs and can move directions during editing; aggregate marker counts remain shared."
     }
   },
-  "downloadedAt": "2026-10-17"
+  "downloadedAt": "2026-10-17",
+  "dokdo": {
+    "provider": "Statistics Korea SGIS / vuski/admdongkor",
+    "year": 2018,
+    "source": "https://raw.githubusercontent.com/vuski/admdongkor/dd1881663fcabc69b81393604e91ebf3a4202e9a/ver20180724/HangJeongDong_ver20180724.geojson",
+    "sha256": "1a48aff8eb84de8cdb1c65320f1e5549b665d426f78aa9445f5066aeaf59aa64",
+    "parent_code": "37430",
+    "source_adm_cd": "3743011",
+    "processing": "Extract only the original east and west Dokdo islet polygons from Ulleung-eup; normalize ring winding for D3, no simplification, rescaling or relocation. Append to Ulleung county before deriving provincial boundaries.",
+    "license": "CC BY 4.0; underlying SGIS KOGL Type 1 attribution retained in DOKDO-LICENSE.txt and app data dialog.",
+    "reference": "https://dokdo.mofa.go.kr/kor/introduce/outline.jsp",
+    "reference_points": {
+      "east": [
+        131.86955555555556,
+        37.24077777777778
+      ],
+      "west": [
+        131.86516666666665,
+        37.24183333333333
+      ]
+    },
+    "verification": "Each reference point is inside its islet polygon. Nearest sampled shoreline vertices are ~87.64 km from Ulleung, southeast bearing. Coordinates remain within 131.8632–131.8713 E, 37.2383–37.2443 N."
+  }
 }

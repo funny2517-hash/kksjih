@@ -14,6 +14,7 @@ import {
 } from "./records.js";
 import { preparePhoto } from "./photo.js";
 import "./style.css";
+import { islandLandmarks } from "./islands.js";
 import {
   mergeRestAreas,
   restDirections,
@@ -36,6 +37,8 @@ const escape = (s) =>
 let currentProvince = null;
 let activeRestPoint = null;
 let geo,
+  dokdo,
+  landmarks,
   rests,
   records = [],
   targets = new Map(),
@@ -57,7 +60,8 @@ let svg,
   transform = d3.zoomIdentity,
   regionPaths,
   labelLayer,
-  markerLayer;
+  markerLayer,
+  islandLayer;
 function notify(message, error = false) {
   const el = $("#notice");
   el.textContent = message;
@@ -82,10 +86,12 @@ async function start() {
   const responses = await Promise.all([
     fetch("/data/hierarchy.geojson"),
     fetch("/data/rest-areas.json"),
+    fetch("/data/dokdo.geojson"),
   ]);
   if (responses.some((r) => !r.ok))
     throw new Error("지도 데이터를 불러오지 못했습니다.");
-  [geo, rests] = await Promise.all(responses.map((r) => r.json()));
+  [geo, rests, dokdo] = await Promise.all(responses.map((r) => r.json()));
+  landmarks = islandLandmarks(geo, dokdo);
   rests = mergeRestAreas(rests);
   records = await loadRecords();
   geo.features.forEach((f) => {
@@ -107,7 +113,7 @@ async function start() {
   <aside id="details" class="details" aria-label="여행 기록"></aside></main>
   <footer><span>둘만의 순간을, 지도 위에 오래도록.</span><button id="data-info">지도 데이터·저장 안내 ↗</button></footer>
   <div id="notice" role="status" hidden></div>
-  <dialog id="info-dialog"><h2>실제 지도로 만나는 대한민국</h2><p>행정경계: 통계청(KOSTAT) 기반 South Korea Maps의 <b>2018년 경계 기반 시·도 17개 → 최종 시·군·구 229개</b>를 표시합니다. 도의 일반시 안에 나뉜 구는 실제 경계를 합쳐 시로 표시합니다. 사진은 최종 지역에만 등록합니다. 원본을 형태 보존 방식으로 단순화했습니다. 최신 행정구역과 차이가 있을 수 있습니다.</p><p>휴게소: 공개 저장소 rest_area_main의 위치 데이터 <b>210개 원본을 ${rests.length}곳으로 통합</b>해 표시합니다. 같은 노선·이름의 상·하행은 네모 지점 하나로 표시하며, 선택하면 방향 탭별로 사진과 기록을 따로 저장합니다. 단일 시설은 동그라미입니다. 대표 위치는 원본 좌표 중 하나를 사용하며, 전국 모든 휴게소 및 최신 개통·폐쇄를 보장하지 않습니다. 임의 생성한 좌표는 없습니다.</p><p>사진과 기록은 이 기기·브라우저의 IndexedDB에 저장됩니다. 서버 업로드나 기기 간 자동 동기화는 없습니다. 브라우저 데이터 삭제·시크릿 모드에서는 소실될 수 있으므로 정기적으로 백업하세요. 사진은 긴 변 1600px JPEG로 저장됩니다.</p><p><a href="https://github.com/southkorea/southkorea-maps" target="_blank" rel="noreferrer">경계 데이터 출처</a> · <a href="https://github.com/kmj381900-debug/rest_area_main" target="_blank" rel="noreferrer">휴게소 데이터 출처</a></p><button class="primary" data-close>확인</button></dialog>
+  <dialog id="info-dialog"><h2>실제 지도로 만나는 대한민국</h2><p>행정경계: 통계청(KOSTAT) 기반 South Korea Maps의 <b>2018년 경계 기반 시·도 17개 → 최종 시·군·구 229개</b>를 표시합니다. 도의 일반시 안에 나뉜 구는 실제 경계를 합쳐 시로 표시합니다. 사진은 최종 지역에만 등록합니다. 원본을 형태 보존 방식으로 단순화했습니다. 누락된 독도 동·서도는 별도의 실제 2018년 SGIS 경계로 보완했으며, 울릉도·독도를 이동시킨 삽입지도는 사용하지 않습니다. 작은 점과 연결선은 위치 식별용 표식입니다. 최신 행정구역과 차이가 있을 수 있습니다.</p><p>휴게소: 공개 저장소 rest_area_main의 위치 데이터 <b>210개 원본을 ${rests.length}곳으로 통합</b>해 표시합니다. 같은 노선·이름의 상·하행은 네모 지점 하나로 표시하며, 선택하면 방향 탭별로 사진과 기록을 따로 저장합니다. 단일 시설은 동그라미입니다. 대표 위치는 원본 좌표 중 하나를 사용하며, 전국 모든 휴게소 및 최신 개통·폐쇄를 보장하지 않습니다. 임의 생성한 좌표는 없습니다.</p><p>사진과 기록은 이 기기·브라우저의 IndexedDB에 저장됩니다. 서버 업로드나 기기 간 자동 동기화는 없습니다. 브라우저 데이터 삭제·시크릿 모드에서는 소실될 수 있으므로 정기적으로 백업하세요. 사진은 긴 변 1600px JPEG로 저장됩니다.</p><p><a href="https://github.com/southkorea/southkorea-maps" target="_blank" rel="noreferrer">경계 데이터 출처</a> · <a href="https://github.com/kmj381900-debug/rest_area_main" target="_blank" rel="noreferrer">휴게소 데이터 출처</a></p><p class="data-attribution">독도 경계: 통계청 SGIS 공공누리 제1유형 자료를 가공한 vuski/admdongkor, CC BY 4.0. <a href="https://github.com/vuski/admdongkor" target="_blank" rel="noreferrer">출처</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">라이선스</a></p><button class="primary" data-close>확인</button></dialog>
   <dialog id="restore-dialog"><h2>여행 기록을 복원할까요?</h2><p id="restore-summary"></p><p>기존 기록을 유지하며 추가합니다. 같은 ID의 기록은 백업 내용으로 덮어씁니다. 복원 전 현재 기록을 백업해 두세요.</p><div class="dialog-actions"><button data-close>취소</button><button id="confirm-restore" class="primary">복원하기</button></div></dialog>
   <dialog id="photo-dialog"><button data-close aria-label="사진 닫기">✕ 닫기</button><img id="large-photo" alt="여행 사진 크게 보기"></dialog>`;
   bind();
@@ -411,6 +417,7 @@ function buildMap() {
     .append("g")
     .attr("class", "labels")
     .attr("aria-hidden", "true");
+  islandLayer = svg.append("g").attr("class", "island-callouts");
   new ResizeObserver(() => updateLabels()).observe(svg.node());
   zoom = d3
     .zoom()
@@ -526,13 +533,14 @@ function updateMap() {
 function updateLabels() {
   if (!labelLayer) return;
   labelLayer.selectAll("*").remove();
+  islandLayer.selectAll("*").remove();
   if (!$("#labels").checked) return;
   const matrix = svg.node().getScreenCTM();
   const scale = matrix ? Math.hypot(matrix.a, matrix.b) : 1;
   if (!scale) return;
   const fontSize = 12 / scale;
   const candidates = [...targets.values()]
-    .filter(matches)
+    .filter((t) => matches(t) && t.id !== "region-37430")
     .map((t) => ({
       t,
       p: t.feature ? path.centroid(t.feature) : projection([t.lng, t.lat]),
@@ -542,7 +550,7 @@ function updateLabels() {
         (b.t.id === selected) - (a.t.id === selected) ||
         listRecords(b.t.id).length - listRecords(a.t.id).length,
     );
-  const boxes = [];
+  const boxes = drawIslandCallouts(scale);
   for (const { t, p } of candidates) {
     const screen = transform.apply(p);
     const x = Math.round(screen[0] * scale) / scale;
@@ -584,6 +592,93 @@ function updateLabels() {
     }
     boxes.push(box);
   }
+}
+function drawIslandCallouts(scale) {
+  const boxes = [];
+  if (tab === "region" && currentProvince && currentProvince !== "37")
+    return boxes;
+  for (const landmark of landmarks) {
+    const [x, y] = transform.apply(projection(landmark.coordinates));
+    if (x < 10 || x > 890 || y < 100 || y > 765) continue;
+    const toLeft = x + 80 / scale > 885;
+    const endX = x + (toLeft ? -18 : 18) / scale,
+      endY = y - 16 / scale;
+    const group = islandLayer
+      .append("g")
+      .attr("data-island", landmark.id)
+      .attr("data-longitude", landmark.coordinates[0])
+      .attr("data-latitude", landmark.coordinates[1])
+      .attr("data-map-x", x)
+      .attr("data-map-y", y)
+      .attr("role", tab === "region" ? "button" : "img")
+      .attr("aria-label", landmark.name + " 실제 위치")
+      .attr("tabindex", tab === "region" ? 0 : null);
+    const open = () => {
+      if (tab === "region")
+        selectPlace(
+          currentProvince ? "region-37430" : "province-37",
+          Boolean(currentProvince),
+        );
+    };
+    group.on("click", open).on("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        open();
+      }
+    });
+    group
+      .append("circle")
+      .attr("cx", x)
+      .attr("cy", y)
+      .attr("r", 3 / scale)
+      .attr("stroke-width", 1 / scale);
+    group
+      .append("line")
+      .attr("x1", x)
+      .attr("y1", y)
+      .attr("x2", endX)
+      .attr("y2", endY)
+      .attr("stroke-width", 1 / scale);
+    const text = group
+      .append("text")
+      .attr("x", endX + (toLeft ? -3 : 3) / scale)
+      .attr("y", endY)
+      .attr("text-anchor", toLeft ? "end" : "start")
+      .attr("font-size", 12 / scale)
+      .attr("stroke-width", 2 / scale)
+      .text(landmark.name);
+    group
+      .append("title")
+      .text(
+        `${landmark.name}: 북위 ${landmark.coordinates[1].toFixed(5)}°, 동경 ${landmark.coordinates[0].toFixed(5)}°. 실제 경계 위치를 가리키는 식별용 표식입니다.`,
+      );
+    const b = text.node().getBBox();
+    group
+      .insert("rect", ":first-child")
+      .attr("class", "island-hitbox")
+      .attr("x", Math.min(x - 6 / scale, b.x - 4 / scale))
+      .attr("y", Math.min(y - 6 / scale, b.y - 4 / scale))
+      .attr(
+        "width",
+        Math.max(x + 6 / scale, b.x + b.width + 4 / scale) -
+          Math.min(x - 6 / scale, b.x - 4 / scale),
+      )
+      .attr(
+        "height",
+        Math.max(y + 6 / scale, b.y + b.height + 4 / scale) -
+          Math.min(y - 6 / scale, b.y - 4 / scale),
+      )
+      .attr("fill", "transparent")
+      .attr("stroke", "none")
+      .attr("pointer-events", "all");
+    boxes.push([
+      Math.min(x - 5 / scale, b.x - 3 / scale),
+      Math.min(y - 5 / scale, b.y - 3 / scale),
+      Math.max(x + 5 / scale, b.x + b.width + 3 / scale),
+      Math.max(y + 5 / scale, b.y + b.height + 3 / scale),
+    ]);
+  }
+  return boxes;
 }
 function renderDetails() {
   const el = $("#details");

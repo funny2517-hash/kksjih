@@ -533,3 +533,59 @@ test("district labels remain legible at fixed screen size without collisions whe
   check(await inspect());
   await page.screenshot({ path: "/tmp/kksjih-labels.png", fullPage: true });
 });
+
+test("Ulleung and Dokdo use distinct true positions and Dokdo remains in bounds through navigation and zoom", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const u = page.locator('[data-island="ulleung"]'),
+    d = page.locator('[data-island="dokdo"]');
+  await expect(u).toBeVisible();
+  await expect(d).toBeVisible();
+  async function positions() {
+    const [up, dp] = await Promise.all([
+      u.evaluate((el) => ({
+        x: +el.dataset.mapX,
+        y: +el.dataset.mapY,
+        lng: +el.dataset.longitude,
+        lat: +el.dataset.latitude,
+      })),
+      d.evaluate((el) => ({
+        x: +el.dataset.mapX,
+        y: +el.dataset.mapY,
+        lng: +el.dataset.longitude,
+        lat: +el.dataset.latitude,
+      })),
+    ]);
+    expect(dp.x).toBeGreaterThan(up.x);
+    expect(dp.y).toBeGreaterThan(up.y);
+    expect(dp.lng).toBeGreaterThan(131.86);
+    expect(dp.lng).toBeLessThan(131.88);
+    expect(dp.lat).toBeGreaterThan(37.23);
+    expect(dp.lat).toBeLessThan(37.25);
+  }
+  await positions();
+  await page.screenshot({
+    path: "/tmp/kksjih-dokdo-national.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await d.click();
+  await expect(page.locator("#map-breadcrumb")).toContainText("경상북도");
+  await expect(d).toBeVisible();
+  await positions();
+  await d.click();
+  await expect(page.locator(".detail-heading h2")).toContainText("울릉군");
+  await expect(page.locator("#new-record")).toBeVisible();
+  await page.locator("#reset-map").click();
+  await page.waitForTimeout(500);
+  await positions();
+  await page.screenshot({
+    path: "/tmp/kksjih-dokdo-gyeongbuk.png",
+    fullPage: true,
+  });
+  await page.locator("#labels").uncheck();
+  await expect(page.locator(".island-callouts g")).toHaveCount(0);
+  await page.locator("#labels").check();
+  await expect(d).toBeVisible();
+});
