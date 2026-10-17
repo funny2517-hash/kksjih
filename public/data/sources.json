@@ -20,7 +20,11 @@
     "source": "https://raw.githubusercontent.com/kmj381900-debug/rest_area_main/78e6a7987c23aa22685e8461f2a42c8ed3c879e0/rest_areas.db",
     "sha256": "3acbe972f32dc6349a110e5200e08d5705a673b8d56ed1124368d043df7681e9",
     "processing": "Extract factual names, route numbers, directions and WGS84 latitude/longitude; no invented coordinates",
-    "limitations": "Third-party snapshot; original survey date and comprehensive coverage are not documented. Not a direct live Korea Expressway Corporation feed."
+    "limitations": "Third-party snapshot; original survey date and comprehensive coverage are not documented. Not a direct live Korea Expressway Corporation feed.",
+    "display": {
+      "count": 128,
+      "grouping": "Same base name and route; direction suffix ignored. One original coordinate represents each group; every original ID remains a record alias."
+    }
   },
   "downloadedAt": "2026-10-17"
 }

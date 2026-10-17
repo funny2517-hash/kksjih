@@ -68,7 +68,7 @@ test("real map, photo puzzle, edit, multiple visits, durable persistence, zoom, 
   await expect(page.locator(".labels text")).toHaveCount(0);
   await page.locator("#labels").check();
   await page.getByRole("tab", { name: "휴게소", exact: true }).click();
-  await expect(page.locator(".markers circle")).toHaveCount(210);
+  await expect(page.locator(".markers circle")).toHaveCount(128);
   await choose(page, "평창");
   await add(page, "휴게소에서 커피", true);
   await expect(page.locator("#rest-count")).toHaveText("1");
@@ -146,7 +146,7 @@ test("two-level actual map: province to final city/county/district, never a thir
   await page.locator("#route").selectOption("50");
   const count = await page.locator("[data-place]").count();
   expect(count).toBeGreaterThan(0);
-  expect(count).toBeLessThan(210);
+  expect(count).toBeLessThan(128);
   await expect(page.locator(".markers circle")).toHaveCount(count);
 });
 test("records survive a complete browser close and reopen", async ({
@@ -311,13 +311,11 @@ test("Pyeongtaek photo paints the actual puzzle interior, survives zoom/reload a
     x.fillRect(100, 0, 100, 100);
     return c.toDataURL("image/png").split(",")[1];
   });
-  await page
-    .locator("#photos")
-    .setInputFiles({
-      name: "red-blue.png",
-      mimeType: "image/png",
-      buffer: Buffer.from(base64, "base64"),
-    });
+  await page.locator("#photos").setInputFiles({
+    name: "red-blue.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(base64, "base64"),
+  });
   await expect(page.locator("#photo-previews img")).toHaveCount(1);
   await page.locator("#save-record").click();
   await expect(page.locator(".memory img")).toHaveCount(1);
@@ -367,4 +365,91 @@ test("Pyeongtaek photo paints the actual puzzle interior, survives zoom/reload a
   await page.getByRole("button", { name: "삭제", exact: true }).click();
   await expect(region).toHaveAttribute("fill", "#fdfdf9");
   await expect(page.locator("#map defs pattern")).toHaveCount(0);
+});
+
+test("up/down rest stop backups merge into one marker and one shared journal", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator("[data-place]").first().waitFor();
+  const records = ["rest-4", "rest-5"].map((target, i) => ({
+    id: "legacy-rest-" + i,
+    target,
+    date: "2026-10-17",
+    title: i ? "하행 추억" : "상행 추억",
+    memo: "기존 기록",
+    photos: [],
+  }));
+  await page
+    .locator("#restore-file")
+    .setInputFiles({
+      name: "old.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(
+        JSON.stringify({ format: "our-korea-map", version: 1, records }),
+      ),
+    });
+  await page.locator("#confirm-restore").click();
+  await expect(page.locator("#memory-count")).toHaveText("2");
+  await expect(page.locator("#rest-count")).toHaveText("1");
+  await page.getByRole("tab", { name: "휴게소", exact: true }).click();
+  await expect(page.locator(".markers circle")).toHaveCount(128);
+  await page.locator("#search").fill("함안");
+  await expect(page.locator("[data-place]")).toHaveCount(1);
+  await expect(page.locator(".markers circle")).toHaveCount(1);
+  await page.locator("[data-place]").click();
+  await expect(page.locator(".memory")).toHaveCount(2);
+  await expect(page.locator("#details")).toContainText("상행 추억");
+  await expect(page.locator("#details")).toContainText("하행 추억");
+  await expect(page.locator(".detail-heading")).toContainText("상·하행 통합");
+  await page.reload();
+  await expect(page.locator("#rest-count")).toHaveText("1");
+});
+
+test("district labels remain legible at fixed screen size without collisions when zoomed or resized", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator('[data-place="province-11"]').click();
+  async function inspect() {
+    return page.locator(".labels text").evaluateAll((labels) =>
+      labels.map((el) => {
+        const box = el.getBoundingClientRect();
+        const matrix = el.getScreenCTM();
+        return {
+          name: el.textContent,
+          size:
+            parseFloat(getComputedStyle(el).fontSize) *
+            Math.hypot(matrix.a, matrix.b),
+          x: box.x,
+          y: box.y,
+          right: box.right,
+          bottom: box.bottom,
+        };
+      }),
+    );
+  }
+  function check(labels) {
+    expect(labels.length).toBeGreaterThan(6);
+    for (const label of labels) {
+      expect(label.size).toBeCloseTo(12, 1);
+      expect(label.name).toMatch(/구$/);
+    }
+    for (let i = 0; i < labels.length; i++)
+      for (let j = i + 1; j < labels.length; j++) {
+        const a = labels[i],
+          b = labels[j];
+        expect(
+          a.x < b.right && a.right > b.x && a.y < b.bottom && a.bottom > b.y,
+        ).toBe(false);
+      }
+  }
+  check(await inspect());
+  await page.locator("#zoom-in").click();
+  await page.waitForTimeout(400);
+  check(await inspect());
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await page.waitForTimeout(200);
+  check(await inspect());
+  await page.screenshot({ path: "/tmp/kksjih-labels.png", fullPage: true });
 });

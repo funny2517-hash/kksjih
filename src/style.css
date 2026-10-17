@@ -430,12 +430,18 @@ input[type="checkbox"] {
   pointer-events: none;
 }
 .labels text {
-  fill: #78866d;
-  stroke: #fffffbe8;
+  font-family:
+    "Noto Sans KR", "Noto Sans CJK KR", "Malgun Gothic", "Apple SD Gothic Neo",
+    system-ui, sans-serif;
+  fill: #465c3b;
+  stroke: #fffffff2;
+  stroke-linejoin: round;
+  dominant-baseline: central;
+  text-rendering: optimizeLegibility;
   paint-order: stroke;
   text-anchor: middle;
-  font-weight: 500;
-  letter-spacing: -0.4px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 .map-watermark {
   position: absolute;

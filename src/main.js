@@ -14,6 +14,7 @@ import {
 } from "./records.js";
 import { preparePhoto } from "./photo.js";
 import "./style.css";
+import { mergeRestAreas } from "./rest-areas.js";
 import {
   targetForFeature,
   recordTargets,
@@ -80,6 +81,7 @@ async function start() {
   if (responses.some((r) => !r.ok))
     throw new Error("지도 데이터를 불러오지 못했습니다.");
   [geo, rests] = await Promise.all(responses.map((r) => r.json()));
+  rests = mergeRestAreas(rests);
   records = await loadRecords();
   geo.features.forEach((f) => {
     const target = targetForFeature(f);
@@ -100,7 +102,7 @@ async function start() {
   <aside id="details" class="details" aria-label="여행 기록"></aside></main>
   <footer><span>둘만의 순간을, 지도 위에 오래도록.</span><button id="data-info">지도 데이터·저장 안내 ↗</button></footer>
   <div id="notice" role="status" hidden></div>
-  <dialog id="info-dialog"><h2>실제 지도로 만나는 대한민국</h2><p>행정경계: 통계청(KOSTAT) 기반 South Korea Maps의 <b>2018년 경계 기반 시·도 17개 → 최종 시·군·구 229개</b>를 표시합니다. 도의 일반시 안에 나뉜 구는 실제 경계를 합쳐 시로 표시합니다. 사진은 최종 지역에만 등록합니다. 원본을 형태 보존 방식으로 단순화했습니다. 최신 행정구역과 차이가 있을 수 있습니다.</p><p>휴게소: 공개 저장소 rest_area_main의 위치 데이터 <b>210개</b>를 사용합니다. 상·하행은 별도 지점이며, 전국 모든 휴게소 및 최신 개통·폐쇄를 보장하지 않습니다. 임의 생성한 좌표는 없습니다.</p><p>사진과 기록은 이 기기·브라우저의 IndexedDB에 저장됩니다. 서버 업로드나 기기 간 자동 동기화는 없습니다. 브라우저 데이터 삭제·시크릿 모드에서는 소실될 수 있으므로 정기적으로 백업하세요. 사진은 긴 변 1600px JPEG로 저장됩니다.</p><p><a href="https://github.com/southkorea/southkorea-maps" target="_blank" rel="noreferrer">경계 데이터 출처</a> · <a href="https://github.com/kmj381900-debug/rest_area_main" target="_blank" rel="noreferrer">휴게소 데이터 출처</a></p><button class="primary" data-close>확인</button></dialog>
+  <dialog id="info-dialog"><h2>실제 지도로 만나는 대한민국</h2><p>행정경계: 통계청(KOSTAT) 기반 South Korea Maps의 <b>2018년 경계 기반 시·도 17개 → 최종 시·군·구 229개</b>를 표시합니다. 도의 일반시 안에 나뉜 구는 실제 경계를 합쳐 시로 표시합니다. 사진은 최종 지역에만 등록합니다. 원본을 형태 보존 방식으로 단순화했습니다. 최신 행정구역과 차이가 있을 수 있습니다.</p><p>휴게소: 공개 저장소 rest_area_main의 위치 데이터 <b>210개 원본을 ${rests.length}곳으로 통합</b>해 표시합니다. 같은 노선·이름의 상·하행은 한 지점으로 묶고 기존 기록도 함께 표시합니다. 대표 위치는 원본 좌표 중 하나를 사용하며, 전국 모든 휴게소 및 최신 개통·폐쇄를 보장하지 않습니다. 임의 생성한 좌표는 없습니다.</p><p>사진과 기록은 이 기기·브라우저의 IndexedDB에 저장됩니다. 서버 업로드나 기기 간 자동 동기화는 없습니다. 브라우저 데이터 삭제·시크릿 모드에서는 소실될 수 있으므로 정기적으로 백업하세요. 사진은 긴 변 1600px JPEG로 저장됩니다.</p><p><a href="https://github.com/southkorea/southkorea-maps" target="_blank" rel="noreferrer">경계 데이터 출처</a> · <a href="https://github.com/kmj381900-debug/rest_area_main" target="_blank" rel="noreferrer">휴게소 데이터 출처</a></p><button class="primary" data-close>확인</button></dialog>
   <dialog id="restore-dialog"><h2>여행 기록을 복원할까요?</h2><p id="restore-summary"></p><p>기존 기록을 유지하며 추가합니다. 같은 ID의 기록은 백업 내용으로 덮어씁니다. 복원 전 현재 기록을 백업해 두세요.</p><div class="dialog-actions"><button data-close>취소</button><button id="confirm-restore" class="primary">복원하기</button></div></dialog>
   <dialog id="photo-dialog"><button data-close aria-label="사진 닫기">✕ 닫기</button><img id="large-photo" alt="여행 사진 크게 보기"></dialog>`;
   bind();
@@ -288,13 +290,13 @@ function changeTab(next) {
   $("#explore-copy").textContent =
     tab === "region"
       ? "지도에서 지역을 선택해 추억을 남겨요."
-      : "상·하행 휴게소에 작은 추억을 남겨요.";
+      : "상·하행 구분 없이 추억을 남겨요.";
   $("#list-caption").textContent =
     tab === "region" ? "전국 시·군·구" : "데이터에 포함된 휴게소";
   $("#map-title").textContent =
     tab === "region" ? "대한민국 여행 퍼즐" : "우리의 고속도로 쉼표";
   $("#map-subtitle").textContent =
-    tab === "region" ? "2018 시·군·구 경계" : "실제 좌표 · 210개 지점";
+    tab === "region" ? "2018 시·군·구 경계" : "실제 좌표 · 상·하행 통합";
   fitScope();
   update();
   renderDetails();
@@ -392,7 +394,11 @@ function buildMap() {
   g = svg.append("g");
   g.append("g").attr("class", "regions");
   markerLayer = g.append("g").attr("class", "markers");
-  labelLayer = g.append("g").attr("class", "labels");
+  labelLayer = svg
+    .append("g")
+    .attr("class", "labels")
+    .attr("aria-hidden", "true");
+  new ResizeObserver(() => updateLabels()).observe(svg.node());
   zoom = d3
     .zoom()
     .scaleExtent([1, 16])
@@ -500,6 +506,10 @@ function updateLabels() {
   if (!labelLayer) return;
   labelLayer.selectAll("*").remove();
   if (!$("#labels").checked) return;
+  const matrix = svg.node().getScreenCTM();
+  const scale = matrix ? Math.hypot(matrix.a, matrix.b) : 1;
+  if (!scale) return;
+  const fontSize = 12 / scale;
   const candidates = [...targets.values()]
     .filter(matches)
     .map((t) => ({
@@ -513,34 +523,45 @@ function updateLabels() {
     );
   const boxes = [];
   for (const { t, p } of candidates) {
-    const [x, y] = transform.apply(p);
-    if (x < 18 || x > 882 || y < 15 || y > 805) continue;
-    const w = t.name.length * 10 + 8,
-      h = 18,
-      box = [x - w / 2, y - h / 2, x + w / 2, y + h / 2];
-    if (
-      boxes.some(
-        (b) =>
-          box[0] < b[2] + 7 &&
-          box[2] > b[0] - 7 &&
-          box[1] < b[3] + 7 &&
-          box[3] > b[1] - 7,
-      )
-    )
-      continue;
-    if (t.feature && transform.k < 2.2) {
-      const b = path.bounds(t.feature);
-      if ((b[1][0] - b[0][0]) * transform.k < w * 0.65) continue;
-    }
+    const screen = transform.apply(p);
+    const x = Math.round(screen[0] * scale) / scale;
+    const y =
+      Math.round((screen[1] - (t.type === "rest" ? 14 / scale : 0)) * scale) /
+      scale;
     if (t.type === "rest" && transform.k < 2.5 && t.id !== selected) continue;
-    boxes.push(box);
-    labelLayer
+    const text = labelLayer
       .append("text")
-      .attr("x", p[0])
-      .attr("y", p[1] + (t.type === "rest" ? -10 : 3) / transform.k)
-      .attr("font-size", 10 / transform.k)
-      .attr("stroke-width", 3 / transform.k)
+      .attr("data-label", t.id)
+      .attr("x", x)
+      .attr("y", y)
+      .attr("font-size", fontSize)
+      .attr("stroke-width", 2 / scale)
       .text(t.name);
+    const b = text.node().getBBox(),
+      pad = 3 / scale;
+    const box = [
+      b.x - pad,
+      b.y - pad,
+      b.x + b.width + pad,
+      b.y + b.height + pad,
+    ];
+    if (
+      box[0] < 8 ||
+      box[2] > 892 ||
+      box[1] < 100 ||
+      box[3] > 780 ||
+      boxes.some(
+        (other) =>
+          box[0] < other[2] &&
+          box[2] > other[0] &&
+          box[1] < other[3] &&
+          box[3] > other[1],
+      )
+    ) {
+      text.remove();
+      continue;
+    }
+    boxes.push(box);
   }
 }
 function renderDetails() {
@@ -617,8 +638,7 @@ function setEditorBusy(active, label = "추억 저장하기") {
     .forEach((el) => (el.disabled = active));
   $("#save-record").textContent = label;
 }
-const nextFrame = () =>
-  new Promise((resolve) => setTimeout(resolve, 0));
+const nextFrame = () => new Promise((resolve) => setTimeout(resolve, 0));
 function openEditor(r) {
   const t = targets.get(selected);
   if (!t || (t.type === "region" && t.level !== "municipality")) return;
