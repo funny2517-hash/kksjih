@@ -14,16 +14,23 @@ async function choose(page, name = "종로구") {
   await page.locator("#search").fill(name);
   await page.locator("[data-place]").first().click();
 }
-async function add(page, title = "우리의 첫 여행", photo = true) {
+async function add(
+  page,
+  title = "우리의 첫 여행",
+  photo = true,
+  photoBuffer = tiny,
+) {
   await page.getByRole("button", { name: "새로운 추억 남기기" }).click();
   await page.getByLabel("한 줄 제목").fill(title);
   await page
     .getByLabel("여행 메모")
     .fill("함께 걸었던 골목 <script>alert(1)</script>");
   if (photo) {
-    await page
-      .locator("#photos")
-      .setInputFiles({ name: "trip.png", mimeType: "image/png", buffer: tiny });
+    await page.locator("#photos").setInputFiles({
+      name: "trip.png",
+      mimeType: "image/png",
+      buffer: photoBuffer,
+    });
     await expect(page.locator("#photo-previews img")).toHaveCount(1);
   }
   await page.getByRole("button", { name: "추억 저장하기" }).click();
@@ -68,7 +75,7 @@ test("real map, photo puzzle, edit, multiple visits, durable persistence, zoom, 
   await expect(page.locator(".labels text")).toHaveCount(0);
   await page.locator("#labels").check();
   await page.getByRole("tab", { name: "휴게소", exact: true }).click();
-  await expect(page.locator(".markers circle")).toHaveCount(128);
+  await expect(page.locator(".markers .rest-marker")).toHaveCount(128);
   await choose(page, "평창");
   await add(page, "휴게소에서 커피", true);
   await expect(page.locator("#rest-count")).toHaveText("1");
@@ -147,7 +154,7 @@ test("two-level actual map: province to final city/county/district, never a thir
   const count = await page.locator("[data-place]").count();
   expect(count).toBeGreaterThan(0);
   expect(count).toBeLessThan(128);
-  await expect(page.locator(".markers circle")).toHaveCount(count);
+  await expect(page.locator(".markers .rest-marker")).toHaveCount(count);
 });
 test("records survive a complete browser close and reopen", async ({
   playwright,
@@ -367,7 +374,7 @@ test("Pyeongtaek photo paints the actual puzzle interior, survives zoom/reload a
   await expect(page.locator("#map defs pattern")).toHaveCount(0);
 });
 
-test("up/down rest stop backups merge into one marker and one shared journal", async ({
+test("square rest stop opens separate up/down photo journals and preserves original record directions", async ({
   page,
 }) => {
   await page.goto("/");
@@ -380,30 +387,103 @@ test("up/down rest stop backups merge into one marker and one shared journal", a
     memo: "기존 기록",
     photos: [],
   }));
-  await page
-    .locator("#restore-file")
-    .setInputFiles({
-      name: "old.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(
-        JSON.stringify({ format: "our-korea-map", version: 1, records }),
-      ),
-    });
+  await page.locator("#restore-file").setInputFiles({
+    name: "old.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({ format: "our-korea-map", version: 1, records }),
+    ),
+  });
   await page.locator("#confirm-restore").click();
-  await expect(page.locator("#memory-count")).toHaveText("2");
   await expect(page.locator("#rest-count")).toHaveText("1");
   await page.getByRole("tab", { name: "휴게소", exact: true }).click();
-  await expect(page.locator(".markers circle")).toHaveCount(128);
+  await expect(page.locator(".rest-marker")).toHaveCount(128);
+  await expect(page.locator('.rest-marker[data-shape="square"]')).toHaveCount(
+    82,
+  );
+  await expect(page.locator('.rest-marker[data-shape="circle"]')).toHaveCount(
+    46,
+  );
   await page.locator("#search").fill("함안");
-  await expect(page.locator("[data-place]")).toHaveCount(1);
-  await expect(page.locator(".markers circle")).toHaveCount(1);
-  await page.locator("[data-place]").click();
+  const marker = page.locator('[data-rest="rest-4"]');
+  await expect(marker).toHaveAttribute("data-shape", "square");
+  await marker.click();
+  await expect(page.getByRole("tab", { name: /상행.*부산/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.locator(".memory")).toHaveCount(1);
+  await expect(page.locator(".memory")).toContainText("상행 추억");
+  await expect(page.locator(".memory")).not.toContainText("하행 추억");
+  await page.getByRole("tab", { name: /하행.*순천/ }).click();
+  await expect(page.locator(".memory")).toHaveCount(1);
+  await expect(page.locator(".memory")).toContainText("하행 추억");
+  const blue = Buffer.from(
+    await page.evaluate(() => {
+      const c = document.createElement("canvas");
+      c.width = 64;
+      c.height = 40;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "blue";
+      ctx.fillRect(0, 0, 64, 40);
+      return c.toDataURL().split(",")[1];
+    }),
+    "base64",
+  );
+  await add(page, "하행 사진", true, blue);
   await expect(page.locator(".memory")).toHaveCount(2);
-  await expect(page.locator("#details")).toContainText("상행 추억");
-  await expect(page.locator("#details")).toContainText("하행 추억");
-  await expect(page.locator(".detail-heading")).toContainText("상·하행 통합");
+  await page.getByRole("tab", { name: /상행.*부산/ }).click();
+  await add(page, "상행 사진");
+  await expect(page.locator(".memory")).toHaveCount(2);
+  await expect(page.locator("#record-list")).not.toContainText("하행 사진");
+  const downloadPromise = page.waitForEvent("download");
+  await page.locator("#backup").click();
+  const download = await downloadPromise;
+  const backup = JSON.parse(await fs.readFile(await download.path(), "utf8"));
+  const up = backup.records.find((r) => r.title === "상행 사진"),
+    down = backup.records.find((r) => r.title === "하행 사진");
+  expect(up.target).toBe("rest-4");
+  expect(down.target).toBe("rest-5");
+  expect(up.photos[0]).not.toBe(down.photos[0]);
+  await page
+    .locator(".memory")
+    .filter({ hasText: "상행 추억" })
+    .getByRole("button", { name: "수정", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "방문 방향", exact: true })
+    .selectOption("rest-5");
+  await page.locator("#save-record").click();
+  await expect(page.getByRole("tab", { name: /하행.*순천/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.locator(".memory")).toHaveCount(3);
+  await page.locator("#new-record").click();
+  await page.getByLabel("여행 메모").fill("저장하지 않은 메모");
+  page.once("dialog", (d) => d.dismiss());
+  await page.getByRole("tab", { name: /상행.*부산/ }).click();
+  await expect(page.getByRole("tab", { name: /하행.*순천/ })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByLabel("여행 메모")).toHaveValue("저장하지 않은 메모");
+  page.once("dialog", (d) => d.accept());
+  await page.locator("#cancel-editor").click();
   await page.reload();
+  await page.getByRole("tab", { name: "휴게소", exact: true }).click();
+  await page.locator("#search").fill("함안");
+  await page.locator("[data-place]").click();
+  await expect(page.locator(".memory")).toHaveCount(1);
+  await expect(page.locator(".memory")).toContainText("상행 사진");
+  await page.getByRole("tab", { name: /하행.*순천/ }).click();
+  await expect(page.locator(".memory")).toHaveCount(3);
+  await expect(page.locator(".memory img")).toHaveCount(1);
   await expect(page.locator("#rest-count")).toHaveText("1");
+  await page.screenshot({
+    path: "/tmp/kksjih-direction-tabs.png",
+    fullPage: true,
+  });
 });
 
 test("district labels remain legible at fixed screen size without collisions when zoomed or resized", async ({

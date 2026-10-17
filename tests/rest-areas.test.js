@@ -21,7 +21,7 @@ test("up/down stops on the same route become one marker, with every legacy ID an
     );
   const haman = grouped.find((r) => r.name === "함안");
   assert.deepEqual(haman.members, ["rest-4", "rest-5"]);
-  assert.equal(haman.direction, "상·하행 통합");
+  assert.equal(haman.direction, "방향별 기록");
   const records = [
     { id: "a", target: "rest-4" },
     { id: "b", target: "rest-5" },
@@ -43,5 +43,46 @@ test("same-name stops on different routes stay separate; regrouping is determini
   assert.deepEqual(
     mergeRestAreas(points),
     mergeRestAreas([...points].reverse()),
+  );
+});
+
+test("direction tabs use original point IDs, sort up before down, and never mix photo records", async () => {
+  const { restDirections, recordsForDirection } = await import(
+    "../src/rest-areas.js"
+  );
+  const group = mergeRestAreas([
+    {
+      id: "rest-1",
+      name: "예시(부산)",
+      route: "1",
+      direction: "하행",
+      lat: 35,
+      lng: 127,
+    },
+    {
+      id: "rest-2",
+      name: "예시(서울)",
+      route: "1",
+      direction: "상행",
+      lat: 35.1,
+      lng: 127.1,
+    },
+  ])[0];
+  assert.deepEqual(
+    restDirections(group).map((point) => point.id),
+    ["rest-2", "rest-1"],
+  );
+  assert.equal(restDirections(group)[0].destination, "서울");
+  const records = [
+    { id: "up", target: "rest-2", photos: ["up"] },
+    { id: "down", target: "rest-1", photos: ["down"] },
+  ];
+  assert.deepEqual(
+    recordsForDirection(records, "rest-1").map((r) => r.id),
+    ["down"],
+  );
+  assert.deepEqual(
+    recordsForDirection(records, "rest-2").map((r) => r.id),
+    ["up"],
   );
 });

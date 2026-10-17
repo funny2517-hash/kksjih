@@ -23,7 +23,8 @@
     "limitations": "Third-party snapshot; original survey date and comprehensive coverage are not documented. Not a direct live Korea Expressway Corporation feed.",
     "display": {
       "count": 128,
-      "grouping": "Same base name and route; direction suffix ignored. One original coordinate represents each group; every original ID remains a record alias."
+      "grouping": "Same base name and route; direction suffix ignored. One original coordinate represents each group; every original ID remains a record alias.",
+      "recording": "82 paired groups use square markers and separate original-point direction/destination tabs. 46 single-point facilities use circle markers. Records retain original point IDs and can move directions during editing; aggregate marker counts remain shared."
     }
   },
   "downloadedAt": "2026-10-17"

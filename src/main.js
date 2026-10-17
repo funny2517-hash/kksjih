@@ -14,7 +14,11 @@ import {
 } from "./records.js";
 import { preparePhoto } from "./photo.js";
 import "./style.css";
-import { mergeRestAreas } from "./rest-areas.js";
+import {
+  mergeRestAreas,
+  restDirections,
+  recordsForDirection,
+} from "./rest-areas.js";
 import {
   targetForFeature,
   recordTargets,
@@ -30,6 +34,7 @@ const escape = (s) =>
       ],
   );
 let currentProvince = null;
+let activeRestPoint = null;
 let geo,
   rests,
   records = [],
@@ -98,11 +103,11 @@ async function start() {
   <header><a class="brand" href="" aria-label="둘의 지도 홈"><span class="brand-mark">◒</span><div>둘의 지도<small>OUR LITTLE KOREA</small></div></a><div class="header-copy">함께 다녀온 곳이, 우리의 지도가 돼요.</div><div class="backup-actions"><span class="local-badge">● 이 브라우저에 저장</span><button id="backup">↓ 백업</button><button id="restore">↑ 복원</button><input id="restore-file" type="file" accept="application/json,.json" hidden></div></header>
   <section class="topline"><div><span class="eyebrow">ONE TRIP, ONE PIECE</span><h1>차곡차곡, 우리 여행 조각</h1><p>낯선 도시의 설렘부터 휴게소의 작은 추억까지.</p></div><div class="stats"><div><strong id="region-count">0</strong><span>방문한 지역</span></div><div><strong id="rest-count">0</strong><span>들른 휴게소</span></div><div><strong id="memory-count">0</strong><span>함께 쓴 기록</span></div></div></section>
   <main><aside class="explore"><div class="tabs" role="tablist" aria-label="지도 종류"><button role="tab" id="region-tab" aria-selected="true">전국 여행</button><button role="tab" id="rest-tab" aria-selected="false">휴게소</button></div><div class="explore-intro"><h2 id="explore-title">우리의 다음 여행지는?</h2><p id="explore-copy">지도에서 지역을 선택해 추억을 남겨요.</p></div><label class="search-wrap"><span>⌕</span><input id="search" type="search" placeholder="시·도 검색" aria-label="지역 또는 휴게소 검색"></label><label class="route-filter" hidden>고속도로 노선<select id="route"><option value="">모든 노선</option></select></label><label class="visited-filter"><input id="visited-only" type="checkbox"> 방문한 곳만 보기</label><div class="list-heading"><span id="list-caption">전국 시·도</span><span id="list-count"></span></div><div id="place-list" class="place-list"></div><div class="sidebar-note">사진 한 장이 여행의 한 조각.<br>우리만의 대한민국을 완성해 보세요.</div></aside>
-  <section class="map-panel" aria-label="대한민국 여행 지도"><div class="map-top"><div><span class="live-dot"></span><b id="map-title">대한민국 여행 퍼즐</b><span id="map-subtitle">시·도 → 시·군·구</span></div><label><input type="checkbox" id="labels" checked> 지역명</label></div><nav id="map-breadcrumb" aria-label="행정구역 탐색 경로"></nav><svg id="map" viewBox="0 0 900 820" role="img" aria-label="실제 대한민국 행정구역 지도. 마우스 휠로 확대하고 드래그로 이동할 수 있습니다."></svg><div class="map-watermark">OUR<br>LITTLE<br>KOREA<span>함께 채우는 여행 지도</span></div><div class="map-controls"><button id="zoom-in" aria-label="지도 확대">＋</button><button id="zoom-out" aria-label="지도 축소">−</button><button id="reset-map" aria-label="전국 지도 보기">⌂</button></div><div class="map-legend"><span><i class="unvisited"></i>기다리는 여행</span><span><i class="visited"></i>우리의 발자국</span><b id="zoom-level">100%</b></div><div id="map-tooltip" hidden></div></section>
+  <section class="map-panel" aria-label="대한민국 여행 지도"><div class="map-top"><div><span class="live-dot"></span><b id="map-title">대한민국 여행 퍼즐</b><span id="map-subtitle">시·도 → 시·군·구</span></div><label><input type="checkbox" id="labels" checked> 지역명</label></div><nav id="map-breadcrumb" aria-label="행정구역 탐색 경로"></nav><svg id="map" viewBox="0 0 900 820" role="img" aria-label="실제 대한민국 행정구역 지도. 마우스 휠로 확대하고 드래그로 이동할 수 있습니다."></svg><div class="map-watermark">OUR<br>LITTLE<br>KOREA<span>함께 채우는 여행 지도</span></div><div class="map-controls"><button id="zoom-in" aria-label="지도 확대">＋</button><button id="zoom-out" aria-label="지도 축소">−</button><button id="reset-map" aria-label="전국 지도 보기">⌂</button></div><div class="map-legend"><span><i class="unvisited"></i>기다리는 여행</span><span><i class="visited"></i>우리의 발자국</span><span id="rest-shape-legend" hidden>□ 방향별 시설 · ○ 단일 시설</span><b id="zoom-level">100%</b></div><div id="map-tooltip" hidden></div></section>
   <aside id="details" class="details" aria-label="여행 기록"></aside></main>
   <footer><span>둘만의 순간을, 지도 위에 오래도록.</span><button id="data-info">지도 데이터·저장 안내 ↗</button></footer>
   <div id="notice" role="status" hidden></div>
-  <dialog id="info-dialog"><h2>실제 지도로 만나는 대한민국</h2><p>행정경계: 통계청(KOSTAT) 기반 South Korea Maps의 <b>2018년 경계 기반 시·도 17개 → 최종 시·군·구 229개</b>를 표시합니다. 도의 일반시 안에 나뉜 구는 실제 경계를 합쳐 시로 표시합니다. 사진은 최종 지역에만 등록합니다. 원본을 형태 보존 방식으로 단순화했습니다. 최신 행정구역과 차이가 있을 수 있습니다.</p><p>휴게소: 공개 저장소 rest_area_main의 위치 데이터 <b>210개 원본을 ${rests.length}곳으로 통합</b>해 표시합니다. 같은 노선·이름의 상·하행은 한 지점으로 묶고 기존 기록도 함께 표시합니다. 대표 위치는 원본 좌표 중 하나를 사용하며, 전국 모든 휴게소 및 최신 개통·폐쇄를 보장하지 않습니다. 임의 생성한 좌표는 없습니다.</p><p>사진과 기록은 이 기기·브라우저의 IndexedDB에 저장됩니다. 서버 업로드나 기기 간 자동 동기화는 없습니다. 브라우저 데이터 삭제·시크릿 모드에서는 소실될 수 있으므로 정기적으로 백업하세요. 사진은 긴 변 1600px JPEG로 저장됩니다.</p><p><a href="https://github.com/southkorea/southkorea-maps" target="_blank" rel="noreferrer">경계 데이터 출처</a> · <a href="https://github.com/kmj381900-debug/rest_area_main" target="_blank" rel="noreferrer">휴게소 데이터 출처</a></p><button class="primary" data-close>확인</button></dialog>
+  <dialog id="info-dialog"><h2>실제 지도로 만나는 대한민국</h2><p>행정경계: 통계청(KOSTAT) 기반 South Korea Maps의 <b>2018년 경계 기반 시·도 17개 → 최종 시·군·구 229개</b>를 표시합니다. 도의 일반시 안에 나뉜 구는 실제 경계를 합쳐 시로 표시합니다. 사진은 최종 지역에만 등록합니다. 원본을 형태 보존 방식으로 단순화했습니다. 최신 행정구역과 차이가 있을 수 있습니다.</p><p>휴게소: 공개 저장소 rest_area_main의 위치 데이터 <b>210개 원본을 ${rests.length}곳으로 통합</b>해 표시합니다. 같은 노선·이름의 상·하행은 네모 지점 하나로 표시하며, 선택하면 방향 탭별로 사진과 기록을 따로 저장합니다. 단일 시설은 동그라미입니다. 대표 위치는 원본 좌표 중 하나를 사용하며, 전국 모든 휴게소 및 최신 개통·폐쇄를 보장하지 않습니다. 임의 생성한 좌표는 없습니다.</p><p>사진과 기록은 이 기기·브라우저의 IndexedDB에 저장됩니다. 서버 업로드나 기기 간 자동 동기화는 없습니다. 브라우저 데이터 삭제·시크릿 모드에서는 소실될 수 있으므로 정기적으로 백업하세요. 사진은 긴 변 1600px JPEG로 저장됩니다.</p><p><a href="https://github.com/southkorea/southkorea-maps" target="_blank" rel="noreferrer">경계 데이터 출처</a> · <a href="https://github.com/kmj381900-debug/rest_area_main" target="_blank" rel="noreferrer">휴게소 데이터 출처</a></p><button class="primary" data-close>확인</button></dialog>
   <dialog id="restore-dialog"><h2>여행 기록을 복원할까요?</h2><p id="restore-summary"></p><p>기존 기록을 유지하며 추가합니다. 같은 ID의 기록은 백업 내용으로 덮어씁니다. 복원 전 현재 기록을 백업해 두세요.</p><div class="dialog-actions"><button data-close>취소</button><button id="confirm-restore" class="primary">복원하기</button></div></dialog>
   <dialog id="photo-dialog"><button data-close aria-label="사진 닫기">✕ 닫기</button><img id="large-photo" alt="여행 사진 크게 보기"></dialog>`;
   bind();
@@ -239,6 +244,7 @@ function navigateProvince(code) {
   if (!canLeave()) return;
   currentProvince = code;
   selected = null;
+  activeRestPoint = null;
   editing = null;
   dirty = false;
   query = "";
@@ -249,6 +255,7 @@ function navigateProvince(code) {
   renderDetails();
 }
 function renderNavigation() {
+  $("#rest-shape-legend").hidden = tab !== "rest";
   const nav = $("#map-breadcrumb");
   nav.hidden = tab !== "region";
   const province = targets.get("province-" + currentProvince);
@@ -274,6 +281,7 @@ function changeTab(next) {
   if (tab === next || !canLeave()) return;
   tab = next;
   selected = null;
+  activeRestPoint = null;
   editing = null;
   dirty = false;
   query = "";
@@ -290,13 +298,13 @@ function changeTab(next) {
   $("#explore-copy").textContent =
     tab === "region"
       ? "지도에서 지역을 선택해 추억을 남겨요."
-      : "상·하행 구분 없이 추억을 남겨요.";
+      : "네모를 눌러 상·하행별로 기록해요.";
   $("#list-caption").textContent =
     tab === "region" ? "전국 시·군·구" : "데이터에 포함된 휴게소";
   $("#map-title").textContent =
     tab === "region" ? "대한민국 여행 퍼즐" : "우리의 고속도로 쉼표";
   $("#map-subtitle").textContent =
-    tab === "region" ? "2018 시·군·구 경계" : "실제 좌표 · 상·하행 통합";
+    tab === "region" ? "2018 시·군·구 경계" : "네모를 눌러 상·하행 선택";
   fitScope();
   update();
   renderDetails();
@@ -347,6 +355,11 @@ function selectPlace(id, focus = false) {
     navigateProvince(target.province);
     return;
   }
+  if (
+    target.type === "rest" &&
+    (selected !== id || !target.members.includes(activeRestPoint))
+  )
+    activeRestPoint = restDirections(target)[0].id;
   selected = id;
   editing = null;
   dirty = false;
@@ -411,10 +424,7 @@ function buildMap() {
       g.attr("transform", transform);
       $("#zoom-level").textContent = `${Math.round(transform.k * 100)}%`;
       updateLabels();
-      markerLayer
-        .selectAll("circle")
-        .attr("r", 6 / transform.k)
-        .attr("stroke-width", 1.5 / transform.k);
+      markerLayer.selectAll(".rest-marker").attr("transform", markerTransform);
     });
   svg.call(zoom).on("dblclick.zoom", null);
   svg.on("click.clear", (e) => {
@@ -429,6 +439,10 @@ function showTooltip(e, t) {
   tip.style.left = `${Math.min(e.clientX - b.left + 12, b.width - 220)}px`;
   tip.style.top = `${e.clientY - b.top - 35}px`;
   tip.hidden = false;
+}
+function markerTransform(r) {
+  const [x, y] = projection([r.lng, r.lat]);
+  return `translate(${x},${y}) scale(${1 / transform.k})`;
 }
 function updateMap() {
   const features = visibleFeatures();
@@ -482,16 +496,23 @@ function updateMap() {
     .classed("selected", (f) => selected === f.id)
     .classed("muted", (f) => tab === "rest" || !matches(targets.get(f.id)));
   markerLayer
-    .selectAll("circle")
+    .selectAll(".rest-marker")
     .data(
       tab === "rest" ? rests.filter((r) => matches(targets.get(r.id))) : [],
       (r) => r.id,
     )
-    .join("circle")
-    .attr("cx", (r) => projection([r.lng, r.lat])[0])
-    .attr("cy", (r) => projection([r.lng, r.lat])[1])
-    .attr("r", 6 / transform.k)
-    .attr("stroke-width", 1.5 / transform.k)
+    .join("path")
+    .attr("class", "rest-marker")
+    .attr("data-rest", (r) => r.id)
+    .attr("data-shape", (r) => (r.points.length > 1 ? "square" : "circle"))
+    .attr("d", (r) =>
+      d3
+        .symbol()
+        .type(r.points.length > 1 ? d3.symbolSquare : d3.symbolCircle)
+        .size(r.points.length > 1 ? 144 : Math.PI * 36)(),
+    )
+    .attr("transform", markerTransform)
+    .attr("stroke-width", 1.5)
     .attr("fill", (r) => (listRecords(r.id).length ? "#c67764" : "#657c59"))
     .classed("selected", (r) => selected === r.id)
     .on("click", (e, r) => {
@@ -578,9 +599,45 @@ function renderDetails() {
     el.innerHTML = `<div class="detail-empty"><span class="eyebrow">OUR TRAVEL JOURNAL</span><div class="empty-art">⌖<span>♥</span></div><h2>어디서 함께 웃었나요?</h2><p>${tab === "region" ? (currentProvince ? "시·군·구를 선택하면<br>사진과 메모를 남길 수 있어요." : "먼저 시·도를 선택하고<br>시·군·구에 추억을 남겨 보세요.") : "휴게소를 선택해 추억을 남겨 보세요."}</p><div class="progress-card"><div><b>우리의 여행 조각</b><span>${count} / ${total}</span></div><div class="progress-track"><i style="width:${(count / total) * 100}%"></i></div><small>${((count / total) * 100).toFixed(1)}%의 추억을 채웠어요</small></div><div class="tip"><b>이렇게 기록해 보세요</b><p>01 &nbsp; 시·도를 선택하고<br>02 &nbsp; 시·군·구에서 사진을 남기면<br>03 &nbsp; 그 조각이 추억으로 채워져요</p></div></div>`;
     return;
   }
-  const t = targets.get(selected),
-    rs = listRecords(selected);
-  el.innerHTML = `<div class="detail-heading"><span class="eyebrow">${escape(t.sub)}</span><h2>${escape(t.name)}<span>${rs.length ? "♥" : "♡"}</span></h2><p>${rs.length ? `${rs.length}번의 함께한 순간` : "아직 비어 있는 우리의 여행 조각"}</p><button id="new-record" class="primary">＋ 새로운 추억 남기기</button></div><div id="editor"></div><div id="record-list">${rs.length ? rs.map((r) => `<article class="memory" data-record="${escape(r.id)}"><div class="memory-meta"><time>${escape(r.date.replaceAll("-", "."))}</time><span><button data-edit="${escape(r.id)}">수정</button><button data-delete="${escape(r.id)}">삭제</button></span></div><h3>${escape(r.title || "함께한 하루")}</h3>${r.photos.length ? `<div class="memory-photos">${r.photos.map((p, i) => `<button data-photo-record="${escape(r.id)}" data-photo-index="${i}" aria-label="여행 사진 ${i + 1} 크게 보기"><img src="${p}" alt="${escape(t.name)} 여행 사진 ${i + 1}" loading="lazy"></button>`).join("")}</div>` : ""}<p class="memo">${escape(r.memo)}</p></article>`).join("") : '<div class="no-memory">첫 번째 기록을 기다리고 있어요.<br>사진 없이 메모만 남겨도 좋아요.</div>'}</div>`;
+  const t = targets.get(selected);
+  const directions = t.type === "rest" ? restDirections(t) : [];
+  if (
+    directions.length &&
+    !directions.some((point) => point.id === activeRestPoint)
+  )
+    activeRestPoint = directions[0].id;
+  const activeDirection = directions.find(
+    (point) => point.id === activeRestPoint,
+  );
+  const rs =
+    t.type === "rest"
+      ? sortRecords(recordsForDirection(records, activeRestPoint))
+      : listRecords(selected);
+  const directionTabs =
+    directions.length > 1
+      ? `<div class="direction-tabs" role="tablist" aria-label="휴게소 방문 방향">${directions.map((point) => `<button type="button" role="tab" data-direction-point="${point.id}" aria-selected="${point.id === activeRestPoint}" aria-controls="record-list"><b>${escape(point.direction)}</b>${point.destination ? `<span>${escape(point.destination)} 방향</span>` : ""}<small>기록 ${recordsForDirection(records, point.id).length}개</small></button>`).join("")}</div>`
+      : "";
+  const directionHeading = activeDirection
+    ? `<p class="active-direction">${escape(activeDirection.direction)}${activeDirection.destination ? " · " + escape(activeDirection.destination) + " 방향" : ""}</p>`
+    : "";
+  el.innerHTML = `<div class="detail-heading"><span class="eyebrow">${escape(t.sub)}</span><h2>${escape(t.name)}<span>${rs.length ? "♥" : "♡"}</span></h2><p>${rs.length ? `${rs.length}번의 함께한 순간` : "아직 비어 있는 우리의 여행 조각"}</p>${directionTabs}${directionHeading}<button id="new-record" class="primary">＋ 새로운 추억 남기기</button></div><div id="editor"></div><div id="record-list">${rs.length ? rs.map((r) => `<article class="memory" data-record="${escape(r.id)}"><div class="memory-meta"><time>${escape(r.date.replaceAll("-", "."))}</time><span><button data-edit="${escape(r.id)}">수정</button><button data-delete="${escape(r.id)}">삭제</button></span></div><h3>${escape(r.title || "함께한 하루")}</h3>${r.photos.length ? `<div class="memory-photos">${r.photos.map((p, i) => `<button data-photo-record="${escape(r.id)}" data-photo-index="${i}" aria-label="여행 사진 ${i + 1} 크게 보기"><img src="${p}" alt="${escape(t.name)} 여행 사진 ${i + 1}" loading="lazy"></button>`).join("")}</div>` : ""}<p class="memo">${escape(r.memo)}</p></article>`).join("") : '<div class="no-memory">첫 번째 기록을 기다리고 있어요.<br>사진 없이 메모만 남겨도 좋아요.</div>'}</div>`;
+  if (directions.length)
+    $("#record-list").setAttribute(
+      "aria-label",
+      `${activeDirection.direction} 방문 기록`,
+    );
+  el.querySelectorAll("[data-direction-point]").forEach(
+    (button) =>
+      (button.onclick = () => {
+        if (activeRestPoint === button.dataset.directionPoint || !canLeave())
+          return;
+        activeRestPoint = button.dataset.directionPoint;
+        editing = null;
+        dirty = false;
+        photos = [];
+        renderDetails();
+      }),
+  );
   $("#new-record").onclick = () => {
     if (canLeave()) openEditor();
   };
@@ -634,7 +691,7 @@ function setEditorBusy(active, label = "추억 저장하기") {
   if (!form) return;
   form.setAttribute("aria-busy", String(active));
   form
-    .querySelectorAll("input,textarea,button")
+    .querySelectorAll("input,textarea,select,button")
     .forEach((el) => (el.disabled = active));
   $("#save-record").textContent = label;
 }
@@ -647,6 +704,17 @@ function openEditor(r) {
   dirty = false;
   $("#editor").innerHTML =
     `<form id="record-form" novalidate><div class="form-top"><b>${r ? "추억 수정하기" : "새로운 여행 기록"}</b><button type="button" id="cancel-editor" aria-label="기록 작성 취소">✕</button></div><label>방문 날짜<input name="date" type="date" required value="${escape(r?.date || today())}"></label><label>한 줄 제목<input name="title" maxlength="100" placeholder="우리의 어떤 하루였나요?" value="${escape(r?.title || "")}"></label><label>여행 메모<textarea name="memo" rows="4" maxlength="5000" placeholder="함께 본 풍경, 맛있었던 음식, 기억하고 싶은 마음…">${escape(r?.memo || "")}</textarea></label><label class="photo-upload">＋ 사진 추가 <span>최대 6장 · 장당 12MB</span><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><div id="photo-previews"></div><p class="form-hint">사진은 긴 변 1600px로 줄여 이 브라우저에만 저장해요.</p><p id="form-status" class="form-status" role="status" aria-live="polite" hidden></p><button class="primary" id="save-record" type="submit">추억 저장하기</button></form>`;
+  if (t.type === "rest") {
+    const options = restDirections(t);
+    const pointId = r?.target || activeRestPoint;
+    const label = (point) =>
+      `${point.direction}${point.destination ? " · " + point.destination + " 방향" : ""}`;
+    const content =
+      r && options.length > 1
+        ? `<label>방문 방향<select name="restPoint">${options.map((point) => `<option value="${point.id}" ${point.id === pointId ? "selected" : ""}>${escape(label(point))}</option>`).join("")}</select></label>`
+        : `<p class="form-hint">${escape(label(options.find((point) => point.id === pointId) || options[0]))}에 남기는 기록입니다.</p>`;
+    $("#record-form .form-top").insertAdjacentHTML("afterend", content);
+  }
   $("#cancel-editor").onclick = () => {
     if (canLeave()) {
       editing = null;
@@ -696,10 +764,14 @@ function openEditor(r) {
     formStatus("사진과 기록을 저장하고 있어요…");
     try {
       const form = new FormData(e.currentTarget);
+      const pointId =
+        t.type === "rest" ? form.get("restPoint") || activeRestPoint : selected;
+      if (t.type === "rest" && !t.members.includes(pointId))
+        throw new Error("방문 방향을 다시 선택해 주세요.");
       const record = validateRecord(
         {
           id: editing,
-          target: selected,
+          target: pointId,
           date: form.get("date"),
           title: form.get("title").trim(),
           memo: form.get("memo").trim(),
@@ -713,6 +785,7 @@ function openEditor(r) {
       await nextFrame();
       await saveRecord(record);
       records = [...records.filter((r) => r.id !== record.id), record];
+      if (t.type === "rest") activeRestPoint = record.target;
       dirty = false;
       editing = null;
       update();

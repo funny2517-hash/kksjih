@@ -417,12 +417,12 @@ input[type="checkbox"] {
 .regions path.muted {
   opacity: 0.26;
 }
-.markers circle {
+.markers .rest-marker {
   stroke: #fff;
   cursor: pointer;
 }
-.markers circle:hover,
-.markers circle.selected {
+.markers .rest-marker:hover,
+.markers .rest-marker.selected {
   fill: #c47c63;
   stroke: #3d5631;
 }
@@ -753,7 +753,8 @@ input[type="checkbox"] {
   margin-top: 12px;
 }
 #record-form input:not([type="file"]),
-#record-form textarea {
+#record-form textarea,
+#record-form select {
   display: block;
   width: 100%;
   background: #fff;
@@ -1186,4 +1187,47 @@ dialog .dialog-actions {
 }
 #record-form[aria-busy="true"] {
   cursor: progress;
+}
+
+.direction-tabs {
+  display: flex;
+  gap: 7px;
+  margin: 16px 0 10px;
+}
+.direction-tabs button {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 7px;
+  background: #f7f8f2;
+  border: 1px solid #e1e7d9;
+  text-align: center;
+}
+.direction-tabs button[aria-selected="true"] {
+  background: #e5eddc;
+  border-color: #7f9869;
+  color: #486135;
+}
+.direction-tabs b {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+.direction-tabs span {
+  display: block;
+  font-size: 10px;
+  margin-top: 5px;
+}
+.direction-tabs small {
+  display: block;
+  font-size: 9px;
+  margin-top: 7px;
+  color: #839075;
+}
+.detail-heading .active-direction {
+  margin: 8px 0 12px;
+  color: #657c52;
+  font-size: 11px;
+}
+.map-legend {
+  flex-wrap: wrap;
 }
